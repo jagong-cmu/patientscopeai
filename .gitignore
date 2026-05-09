@@ -1,0 +1,41 @@
+# Local data (MIMIC demo, exports)
+/data/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Environment & secrets
+.env
+.env.local
+*.pem
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Cursor / Claude local worktrees (nested repos — never commit)
+.claude/
+
+# Reference clone for UI migration (optional local copy)
+.reference-icu-hub/
+
+# Models / caches (large artifacts)
+/models/checkpoints/
+/models/artifacts/
+/models/saved/
+
+# Node (optional root-level npm experiments, e.g. mongodb driver)
+/node_modules/
+package-lock.json
+
+# Frontend build
+/frontend/node_modules/
+/frontend/dist/
+
+# Narrative cache (Phase 4)
+/.cache/

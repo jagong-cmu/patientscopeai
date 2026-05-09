@@ -1,0 +1,10 @@
+# Frontend-only deploy: omit backend and heavy dirs from the uploaded bundle.
+# Pair with root vercel.json `"framework": null` so Vercel runs the static Vite
+# build only (not the FastAPI preset).
+backend
+python
+models
+notebooks
+sql
+data
+scripts
