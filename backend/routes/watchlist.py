@@ -52,7 +52,8 @@ def get_watchlist():
             WatchlistRow(
                 subject_id=sid,
                 index_stay_id=stay_id,
-                display_patient_id=_anon(sid),
+                display_patient_id=patient_id_numeric(sid),
+                patient_name=synthetic_patient_name(sid),
                 added_at=_added_at_str(d),
                 news_total=nt,
                 news_band=nb,
