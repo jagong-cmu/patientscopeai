@@ -22,7 +22,7 @@ Single source of truth for SQL labels and the demo pipeline. **SQL:** `sql/cohor
 
 ## Other outcomes (removed from v1 scope)
 
-Earlier drafts included (a) 7-day ICU bounce within the same hospitalization and (b) 30-day all-cause readmission (plus elective/non-elective proxies). For the v1 project scope we are **only** targeting **Outcome D** below, so those additional outcomes were removed from `sql/outcomes_readmission_mimic_demo.sql` to reduce ambiguity.
+Earlier drafts included (a) 7-day ICU bounce within the same hospitalization and (b) 30-day all-cause readmission (plus elective/non-elective proxies). For the v1 project scope I am **only** targeting **Outcome D** below, so those additional outcomes were removed from `sql/outcomes_readmission_mimic_demo.sql` to reduce ambiguity.
 
 ## Outcome D — **Unplanned ICU readmission within 72 hours of discharge** (project focus)
 
@@ -43,7 +43,7 @@ There exists a *new* `mimiciv_hosp.admissions` row \(readmission\) for the same 
 **Notes:**
 
 - This is a **hospital readmission** anchored on **hospital discharge** (`dischtime`), not an ICU-to-ICU transfer inside the same `hadm_id`.
-- “Unplanned” is still a proxy; we’re using `admission_type != ELECTIVE` because the demo lacks full claims-style planned-readmission rules.
+- “Unplanned” is still a proxy; I’m using `admission_type != ELECTIVE` because the demo lacks full claims-style planned-readmission rules.
 
 ## Notes on fairness / subgroup reporting
 
