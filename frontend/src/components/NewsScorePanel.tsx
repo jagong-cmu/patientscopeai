@@ -36,9 +36,12 @@ function describeFactor(p: NewsParameterScore): string {
 export function NewsScorePanel({
   data,
   compact = false,
+  embedded = false,
 }: {
   data: NewsScoreResponse;
   compact?: boolean;
+  /** When true, omit nested Card chrome (use inside another Card). */
+  embedded?: boolean;
 }) {
   const elevated = React.useMemo(
     () => data.parameters.filter((p) => p.points >= ELEVATED_POINTS_THRESHOLD),
@@ -65,30 +68,57 @@ export function NewsScorePanel({
         ))}
       </div>
 
-      <Card
-        className={compact ? "p-3 shadow-[var(--shadow-card)]" : "p-4 shadow-[var(--shadow-card)]"}
-        data-panel="news-composite"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              NEWS aggregate (0–20)
-            </p>
-            <p
-              className={
-                compact
-                  ? "mt-0.5 font-tabular text-2xl font-semibold tracking-tight text-foreground"
-                  : "mt-1 font-tabular text-3xl font-semibold tracking-tight text-foreground"
-              }
-            >
-              {data.total_score}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <NewsBandBadge band={data.clinical_risk_band} />
+      {embedded ? (
+        <div
+          className={compact ? "rounded-lg border border-border bg-muted/15 p-3" : "rounded-lg border border-border bg-muted/15 p-4"}
+          data-panel="news-composite"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                NEWS Aggregate (0–20)
+              </p>
+              <p
+                className={
+                  compact
+                    ? "mt-0.5 font-tabular text-2xl font-semibold tracking-tight text-foreground"
+                    : "mt-1 font-tabular text-3xl font-semibold tracking-tight text-foreground"
+                }
+              >
+                {data.total_score}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <NewsBandBadge band={data.clinical_risk_band} />
+            </div>
           </div>
         </div>
-      </Card>
+      ) : (
+        <Card
+          className={compact ? "p-3 shadow-[var(--shadow-card)]" : "p-4 shadow-[var(--shadow-card)]"}
+          data-panel="news-composite"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                NEWS aggregate (0–20)
+              </p>
+              <p
+                className={
+                  compact
+                    ? "mt-0.5 font-tabular text-2xl font-semibold tracking-tight text-foreground"
+                    : "mt-1 font-tabular text-3xl font-semibold tracking-tight text-foreground"
+                }
+              >
+                {data.total_score}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <NewsBandBadge band={data.clinical_risk_band} />
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="news-factors-select" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

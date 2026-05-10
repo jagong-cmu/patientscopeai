@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-from backend.routes import patient, news, risk, narrative, audit, stays, vitals, ward, watchlist, discharge_events
+from backend.routes import patient, news, risk, narrative, audit, stays, vitals, ward, watchlist, discharge_events, status
 
 load_dotenv()
 
@@ -31,6 +31,7 @@ app.include_router(ward.router,      prefix="/api/ward",      tags=["ward"])
 app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(discharge_events.router, prefix="/api/discharge-events", tags=["discharge-events"])
 app.include_router(vitals.router, prefix="/api/vitals", tags=["vitals"])
+app.include_router(status.router, prefix="/api", tags=["system"])
 
 
 @app.get("/health")

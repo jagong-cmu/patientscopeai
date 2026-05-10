@@ -87,13 +87,19 @@ function headingForBlock(index: number, total: number): string | null {
 
 export function NarrativeBlock({ data }: { data: NarrativeResponse | undefined }) {
   const blocks = useMemo(() => (data?.narrative ? narrativeBlocks(data.narrative) : []), [data?.narrative]);
+  const finalBlocks = useMemo(
+    () => (data?.final_recommendations ? narrativeBlocks(data.final_recommendations) : []),
+    [data?.final_recommendations],
+  );
 
   if (!data) return null;
 
   return (
     <Card className="shadow-[var(--shadow-card)]">
       <CardHeader className="flex flex-row flex-wrap items-center gap-3 space-y-0 border-b border-border pb-3">
-        <CardTitle className="text-base font-semibold">Clinical narrative</CardTitle>
+        <CardTitle className="text-base font-semibold">
+          AI discharge recommendations and insights
+        </CardTitle>
         {data.validation_issues && data.validation_issues.length > 0 && (
           <span className="rounded-md bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning-foreground">
             Validation notes present
@@ -113,6 +119,20 @@ export function NarrativeBlock({ data }: { data: NarrativeResponse | undefined }
               </section>
             );
           })}
+          {finalBlocks.length > 0 ? (
+            <section className="border-t border-border pt-8">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Final Recommendations
+              </h3>
+              <div className="space-y-4">
+                {finalBlocks.map((para, j) => (
+                  <p key={j} className="text-base leading-relaxed text-foreground">
+                    {emphasizeClinicalValues(para)}
+                  </p>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </article>
       </CardContent>
     </Card>

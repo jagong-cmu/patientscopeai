@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 
+from backend.services.cohort_split import split_in_unit_vs_pending, ward_bed_capacity
 from backend.services.discharge_events_store import get_discharged_stay_ids
 from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
 from backend.services.mimic import list_icu_stays
@@ -10,12 +11,14 @@ from backend.services.news import compute_news_score
 
 
 def get_ward_operational_context() -> dict:
-    capacity = max(1, int(os.getenv("WARD_BED_CAPACITY", "100")))
-    pending = max(0, int(os.getenv("WARD_PENDING_ADMISSIONS", "0")))
+    capacity = ward_bed_capacity()
+    pending_env = max(0, int(os.getenv("WARD_PENDING_ADMISSIONS", "0")))
     discharged = get_discharged_stay_ids()
-    rows = [r for r in list_icu_stays(ICU_STAY_SCAN_LIMIT) if r["stay_id"] not in discharged]
+    raw = [r for r in list_icu_stays(ICU_STAY_SCAN_LIMIT) if r["stay_id"] not in discharged]
+    in_unit, pending_overflow = split_in_unit_vs_pending(raw, capacity)
+    pending = len(pending_overflow) + pending_env
     census = 0
-    for r in rows:
+    for r in in_unit:
         sid = int(r["stay_id"])
         if compute_news_score(sid):
             census += 1

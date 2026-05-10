@@ -39,7 +39,7 @@ export default function PostMonitoringPage() {
   const listUnavailable = error instanceof Error && error.message.includes("503");
 
   return (
-    <HubLayout title="Post-monitoring" subtitle="Patients flagged for follow-up after ICU discharge">
+    <HubLayout title="Post-Monitoring" subtitle="Patients Flagged For Follow-Up After ICU Discharge">
       {isLoading && (
         <div className="space-y-3" aria-busy="true" aria-label="Loading post-monitoring list">
           <p className="text-sm text-muted-foreground">Loading…</p>

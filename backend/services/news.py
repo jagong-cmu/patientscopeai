@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Literal
 
 from backend.schemas import NewsParameterScore, NewsScoreResponse
+from backend.services.demo_high_news import get_high_news_demo_ids, synthetic_demo_high_news
 from backend.services.mimic import get_patient_summary, get_vitals_last24h
 
 # Chart item groups (MIMIC-IV ICU)
@@ -127,6 +128,10 @@ def compute_news_score(stay_id: int) -> NewsScoreResponse | None:
     patient = get_patient_summary(stay_id)
     if not patient:
         return None
+
+    sid = int(stay_id)
+    if sid in get_high_news_demo_ids():
+        return synthetic_demo_high_news(sid)
 
     vitals = get_vitals_last24h(stay_id)
     limitations: list[str] = []

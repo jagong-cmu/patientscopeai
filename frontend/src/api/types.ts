@@ -30,6 +30,15 @@ export interface WardPreviewRow {
   readmission_risk_72h?: number | null;
 }
 
+/** GET /api/status — PatientScope server + DB heartbeat */
+export interface PatientScopeStatusResponse {
+  service: string;
+  api_ok: boolean;
+  database_ok: boolean;
+  database_ms: number;
+  total_ms: number;
+}
+
 export interface WardSummaryResponse {
   census_count: number;
   bed_capacity: number;
@@ -163,6 +172,8 @@ export interface GroundingEvidence {
 export interface NarrativeResponse {
   stay_id: number;
   narrative: string;
+  /** Directional discharge guidance with reasoning (model output). */
+  final_recommendations?: string;
   similar_cases: SimilarCase[];
   suggestions: string[];
   citations_used?: string[];
@@ -198,11 +209,14 @@ export interface StayListRow {
   icu_los_hours: number | null;
   news_total: number;
   news_band: NewsClinicalBand;
+  readmission_risk_72h?: number | null;
   is_demo: boolean;
 }
 
 export interface StayListResponse {
   stays: StayListRow[];
+  /** Awaiting an ICU bed when census exceeds WARD_BED_CAPACITY */
+  pending_icu_stays: StayListRow[];
 }
 
 export interface VitalsRow {

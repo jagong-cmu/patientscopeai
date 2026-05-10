@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ClinicalSidebar } from "./AppSidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PageConnectivityStatus } from "./PageConnectivityStatus";
 
 const showProdApiMissingBanner =
   import.meta.env.PROD &&
@@ -56,11 +57,12 @@ export function HubLayout({
               </Alert>
             )}
             {(title ?? subtitle) && (
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   {title && <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
                   {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
                 </div>
+                <PageConnectivityStatus />
               </div>
             )}
             {children}

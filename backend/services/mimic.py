@@ -1,5 +1,6 @@
 """MIMIC-IV PostgreSQL query layer (psycopg3)."""
 import os
+import time
 
 import psycopg
 from psycopg.rows import dict_row
@@ -14,6 +15,17 @@ _CONNSTR = (
     f"user={os.getenv('POSTGRES_USER', 'mimic')} "
     f"password={os.getenv('POSTGRES_PASSWORD', 'mimic')}"
 )
+
+
+def ping_database_ms() -> tuple[bool, float]:
+    """Returns (success, round-trip milliseconds)."""
+    t0 = time.perf_counter()
+    try:
+        with _conn() as con, con.cursor() as cur:
+            cur.execute("SELECT 1")
+        return True, (time.perf_counter() - t0) * 1000.0
+    except Exception:
+        return False, (time.perf_counter() - t0) * 1000.0
 
 
 def _conn():
@@ -39,7 +51,9 @@ def get_patient_summary(stay_id: int) -> dict | None:
             p.gender,
             CASE
               WHEN adm.admittime IS NOT NULL THEN
-                adm.admittime::date - make_date(p.anchor_year - p.anchor_age, 1, 1)
+                (p.anchor_age + (
+                  EXTRACT(YEAR FROM adm.admittime)::integer - p.anchor_year
+                ))::double precision
             END AS age_years,
             adm.race,
             adm.insurance,
@@ -144,6 +158,7 @@ def get_labs_last48h(stay_id: int) -> list[dict]:
 def list_icu_stays(limit: int = 100) -> list[dict]:
     """
     ICU stays with los >= 1 for dashboard list (anonymized labels).
+    Excludes in-hospital deaths (MIMIC admissions.hospital_expire_flag).
     Includes primary diagnosis where available.
     """
     sql = """
@@ -151,7 +166,9 @@ def list_icu_stays(limit: int = 100) -> list[dict]:
             icu.stay_id,
             icu.subject_id,
             p.gender,
-            adm.admittime::date - make_date(p.anchor_year - p.anchor_age, 1, 1) AS age_years,
+            (p.anchor_age + (
+                EXTRACT(YEAR FROM adm.admittime)::integer - p.anchor_year
+            ))::double precision AS age_years,
             EXTRACT(EPOCH FROM (icu.outtime - icu.intime)) / 3600 AS icu_los_hours,
             prim_dx.long_title AS primary_diagnosis
         FROM mimiciv_icu.icustays icu
@@ -171,6 +188,7 @@ def list_icu_stays(limit: int = 100) -> list[dict]:
             LIMIT 1
         ) prim_dx ON TRUE
         WHERE icu.los >= 1
+          AND COALESCE(adm.hospital_expire_flag, 0) = 0
         ORDER BY icu.stay_id
         LIMIT %s
     """

@@ -78,7 +78,8 @@ class GroundingEvidence(BaseModel):
 
 class NarrativeResponse(BaseModel):
     stay_id: int
-    narrative: str              # Claude-generated clinical narrative
+    narrative: str              # Claude-generated prose (insights section)
+    final_recommendations: Optional[str] = None  # directional discharge lean + reasoning (citations)
     similar_cases: list[SimilarCase]
     suggestions: list[str]      # actionable, not directive
     citations_used: Optional[list[str]] = None
@@ -198,11 +199,13 @@ class StayListRow(BaseModel):
     icu_los_hours: Optional[float]
     news_total: int             # aggregate NEWS 0–20
     news_band: Literal["low", "medium", "high"]
+    readmission_risk_72h: Optional[float] = None
     is_demo: bool
 
 
 class StayListResponse(BaseModel):
     stays: list[StayListRow]
+    pending_icu_stays: list[StayListRow] = Field(default_factory=list)
 
 
 class VitalsRow(BaseModel):

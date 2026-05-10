@@ -55,21 +55,28 @@ export default function WardOverviewPage() {
   const wardQ = useQuery({
     queryKey: ["ward-summary"],
     queryFn: () => apiGet<WardSummaryResponse>("/api/ward/summary"),
+    staleTime: 60_000,
+    gcTime: 300_000,
   });
 
   const staysQ = useQuery({
     queryKey: ["stays"],
     queryFn: () => apiGet<StayListResponse>("/api/stays"),
+    staleTime: 60_000,
+    gcTime: 300_000,
   });
 
   const alertsQ = useQuery({
     queryKey: ["ward-alerts"],
     queryFn: () => apiGet<WardAlertsResponse>("/api/ward/alerts"),
     retry: false,
+    staleTime: 45_000,
+    gcTime: 300_000,
   });
 
   const data = wardQ.data;
   const stays = staysQ.data?.stays ?? [];
+  const pendingIcu = staysQ.data?.pending_icu_stays ?? [];
 
   const bandCounts = useMemo(() => {
     const m: Record<NewsClinicalBand, number> = { low: 0, medium: 0, high: 0 };
@@ -116,10 +123,10 @@ export default function WardOverviewPage() {
       : undefined;
 
   return (
-    <HubLayout title="Ward overview" subtitle={subtitle}>
+    <HubLayout title="Ward Overview" subtitle={subtitle}>
       {wardQ.isLoading && (
         <div className="space-y-6 animate-in fade-in-0 duration-300" aria-busy="true" aria-label="Loading ward overview">
-          <p className="text-sm text-muted-foreground">Loading ward summary…</p>
+          <p className="text-sm text-muted-foreground">Loading Ward Summary…</p>
           <div className="grid gap-6 lg:grid-cols-2">
             <Skeleton className="h-52 w-full rounded-xl" />
             <Skeleton className="h-52 w-full rounded-xl" />
@@ -148,7 +155,7 @@ export default function WardOverviewPage() {
               style={bedCardSyncStyle}
             >
               <CardHeader className="shrink-0 pb-2">
-                <CardTitle className="text-lg">Bed utilization</CardTitle>
+                <CardTitle className="text-lg">Bed Utilization</CardTitle>
                 <CardDescription>
                   {data.census_count} patients · {data.pending_admissions_count} pending admission
                   {data.pending_admissions_count === 1 ? "" : "s"}
@@ -162,17 +169,17 @@ export default function WardOverviewPage() {
                       <span className="text-muted-foreground"> / </span>
                       {data.bed_capacity}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">Beds in use</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Beds In Use</p>
                   </div>
                   <div className="text-sm">
                     <p className="font-medium tabular-nums">{Math.max(0, data.bed_capacity - data.census_count)}</p>
-                    <p className="text-muted-foreground">Available beds</p>
+                    <p className="text-muted-foreground">Available Beds</p>
                   </div>
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col gap-3 border-t border-border pt-4">
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-foreground">NEWS distribution</h3>
+                    <h3 className="text-sm font-semibold text-foreground">NEWS Distribution</h3>
                     <p className="text-xs tabular-nums text-muted-foreground">
                       Low {bandCounts.low} · Medium {bandCounts.medium} · High {bandCounts.high}
                     </p>
@@ -224,8 +231,8 @@ export default function WardOverviewPage() {
 
             <Card ref={alertsCardRef} className="shadow-[var(--shadow-card)]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Critical alerts</CardTitle>
-                <CardDescription>Labs and monitored patients</CardDescription>
+                <CardTitle className="text-lg">Critical Alerts</CardTitle>
+                <CardDescription>Labs And Monitored Patients</CardDescription>
               </CardHeader>
               <CardContent>
                 {alertsQ.isLoading && (
@@ -258,7 +265,7 @@ export default function WardOverviewPage() {
                                   <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                                     {(a.tags ?? []).includes("icu") ? (
                                       <Badge variant="secondary" className="text-[10px] font-medium uppercase tracking-wide">
-                                        ICU ward
+                                        ICU Ward
                                       </Badge>
                                     ) : null}
                                     {(a.tags ?? []).includes("post_monitoring") ? (
@@ -266,7 +273,7 @@ export default function WardOverviewPage() {
                                         variant="outline"
                                         className="border-primary/45 text-[10px] font-medium uppercase tracking-wide"
                                       >
-                                        Post-monitoring
+                                        Post-Monitoring
                                       </Badge>
                                     ) : null}
                                   </div>
@@ -277,7 +284,7 @@ export default function WardOverviewPage() {
                                     <>
                                       {" · "}
                                       <Link className={patientLinkClass} to={`/patients/${a.stay_id}`}>
-                                        Open stay
+                                        Open Stay
                                       </Link>
                                     </>
                                   ) : null}
@@ -300,10 +307,10 @@ export default function WardOverviewPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="shadow-[var(--shadow-card)]">
               <CardHeader>
-                <CardTitle className="text-lg">Discharge queue</CardTitle>
+                <CardTitle className="text-lg">Discharge Queue</CardTitle>
                 <CardDescription>
-                  Prioritized by 72h readmission risk, then NEWS · {data.discharge_ready_count} patient
-                  {data.discharge_ready_count === 1 ? "" : "s"} · {data.pending_admissions_count} pending admission
+                  Lowest 72h Readmission Risk First (Then NEWS) · {data.discharge_ready_count} Patient
+                  {data.discharge_ready_count === 1 ? "" : "s"} · {data.pending_admissions_count} Pending Admission
                   {data.pending_admissions_count === 1 ? "" : "s"}
                 </CardDescription>
               </CardHeader>
@@ -316,7 +323,7 @@ export default function WardOverviewPage() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Patient</TableHead>
-                        <TableHead className="text-right">72h risk</TableHead>
+                        <TableHead className="text-right">72h Risk</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -350,8 +357,8 @@ export default function WardOverviewPage() {
 
             <Card className="shadow-[var(--shadow-card)]">
               <CardHeader>
-                <CardTitle className="text-lg">Highest risk patients</CardTitle>
-                <CardDescription>By NEWS aggregate (top 10)</CardDescription>
+                <CardTitle className="text-lg">Highest Risk Patients</CardTitle>
+                <CardDescription>Highest 72h Readmission Risk First, Then NEWS (Top 10)</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {data.high_risk_preview.length === 0 ? (
@@ -362,6 +369,7 @@ export default function WardOverviewPage() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Patient</TableHead>
+                        <TableHead className="text-right">72h Risk</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -373,6 +381,11 @@ export default function WardOverviewPage() {
                             <Link className={patientLinkClass} to={`/patients/${row.stay_id}`}>
                               {row.display_patient_id}
                             </Link>
+                          </TableCell>
+                          <TableCell className="text-right font-tabular">
+                            {row.readmission_risk_72h != null
+                              ? `${(row.readmission_risk_72h * 100).toFixed(1)}%`
+                              : "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             <span className="inline-flex items-center justify-end gap-2">
@@ -390,6 +403,13 @@ export default function WardOverviewPage() {
           </div>
 
           <PatientRosterCard rows={stays} isLoading={staysQ.isLoading} />
+          {pendingIcu.length > 0 && (
+            <PatientRosterCard
+              title="Pending ICU Queue"
+              rows={pendingIcu}
+              isLoading={staysQ.isLoading}
+            />
+          )}
         </div>
       )}
     </HubLayout>

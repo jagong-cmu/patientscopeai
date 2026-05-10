@@ -14,6 +14,10 @@ feature set fixed for inference compatibility; SMOTE can be enabled for large co
 Artifacts: models/saved/72h_unplanned_icu.joblib (sklearn Pipeline: imputer → RF),
 .features.json, .report.json, .explain.json
 
+Holdout validation: training reports auc/auprc on 20% stratified test split (random_state=42).
+To re-score only the saved model on the same-style holdout, run: python models/validate_rf.py
+(writes 72h_unplanned_icu.validation.json).
+
 Full MIMIC-IV without a local bulk download: PhysioNet offers MIMIC on Google BigQuery for credentialed users.
 Materialize the same columns as mimicscope.training_dataset_v1 in BigQuery, export to Parquet or CSV,
 then set TRAINING_PARQUET=/path/to/export.parquet or /path/to/export.csv and run (DATABASE_URL not required).

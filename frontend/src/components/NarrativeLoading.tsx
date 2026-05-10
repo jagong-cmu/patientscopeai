@@ -10,7 +10,7 @@ export function NarrativeLoading() {
           <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
         </div>
         <p className="text-center text-sm text-muted-foreground">
-          Generating clinical narrative… This may take up to two minutes.
+          Generating discharge recommendations and insights… This may take up to two minutes.
         </p>
         <div className="flex w-full max-w-md flex-col gap-2">
           <div className="h-2 animate-pulse rounded bg-muted" />

@@ -2,7 +2,7 @@
 
 import os
 
-# MIMIC-IV demo supports ~100 ICU stays with LOS ≥ 1; cap avoids accidental huge scans.
-_ICU_STAY_SCAN_LIMIT = int(os.getenv("ICU_STAY_SCAN_LIMIT", "100"))
+# Default pulls a larger alive cohort (deaths excluded in SQL); cap avoids accidental huge scans on full MIMIC.
+_ICU_STAY_SCAN_LIMIT = int(os.getenv("ICU_STAY_SCAN_LIMIT", "320"))
 
-ICU_STAY_SCAN_LIMIT = max(1, min(500, _ICU_STAY_SCAN_LIMIT))
+ICU_STAY_SCAN_LIMIT = max(1, min(800, _ICU_STAY_SCAN_LIMIT))

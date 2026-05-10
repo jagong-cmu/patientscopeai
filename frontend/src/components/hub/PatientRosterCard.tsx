@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import type { NewsClinicalBand, StayListRow } from "../../api/types";
+import type { StayListRow } from "../../api/types";
+import type { StaySortDir, StaySortField } from "../../lib/sortStayRows";
 import { NewsBandBadge } from "../StatusBadge";
 import {
   Table,
@@ -24,8 +25,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const patientRosterLinkClass =
   "font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline";
 
-const BANDS: (NewsClinicalBand | "all")[] = ["all", "low", "medium", "high"];
-
 export type PatientRosterCardProps = {
   rows: StayListRow[];
   /** Used with filters: total stays before client-side filter */
@@ -33,8 +32,10 @@ export type PatientRosterCardProps = {
   showFilters?: boolean;
   search?: string;
   onSearchChange?: (value: string) => void;
-  bandFilter?: NewsClinicalBand | "all";
-  onBandFilterChange?: (value: NewsClinicalBand | "all") => void;
+  sortField?: StaySortField;
+  sortDir?: StaySortDir;
+  onSortFieldChange?: (value: StaySortField) => void;
+  onSortDirChange?: (value: StaySortDir) => void;
   title?: string;
   isLoading?: boolean;
 };
@@ -45,9 +46,11 @@ export function PatientRosterCard({
   showFilters = false,
   search = "",
   onSearchChange,
-  bandFilter = "all",
-  onBandFilterChange,
-  title = "ICU patient roster",
+  sortField = "news",
+  sortDir = "desc",
+  onSortFieldChange,
+  onSortDirChange,
+  title = "ICU Patient Roster",
   isLoading = false,
 }: PatientRosterCardProps) {
   const subtitle =
@@ -58,14 +61,14 @@ export function PatientRosterCard({
   return (
     <Card className="shadow-[var(--shadow-card)]">
       <CardHeader className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <CardTitle className="text-lg">{title}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           </div>
-          {showFilters && onSearchChange && onBandFilterChange ? (
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
-              <div className="grid w-full gap-2 sm:w-56">
+          {showFilters && onSearchChange && onSortFieldChange && onSortDirChange ? (
+            <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[min(100%,36rem)] lg:flex-row lg:flex-wrap lg:items-end lg:justify-end">
+              <div className="grid w-full gap-2 lg:w-56">
                 <Label htmlFor="roster-search" className="sr-only">
                   Search
                 </Label>
@@ -77,20 +80,27 @@ export function PatientRosterCard({
                 />
               </div>
               <div className="grid w-full gap-2 sm:w-44">
-                <Label className="text-xs text-muted-foreground">NEWS band</Label>
-                <Select
-                  value={bandFilter}
-                  onValueChange={(v) => onBandFilterChange(v as NewsClinicalBand | "all")}
-                >
+                <Label className="text-xs text-muted-foreground">Sort By</Label>
+                <Select value={sortField} onValueChange={(v) => onSortFieldChange(v as StaySortField)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {BANDS.map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b === "all" ? "All bands" : b.charAt(0).toUpperCase() + b.slice(1)}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="risk">Prediction Risk</SelectItem>
+                    <SelectItem value="news">NEWS</SelectItem>
+                    <SelectItem value="age">Age</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid w-full gap-2 sm:w-36">
+                <Label className="text-xs text-muted-foreground">Order</Label>
+                <Select value={sortDir} onValueChange={(v) => onSortDirChange(v as StaySortDir)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                    <SelectItem value="desc">Descending</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -116,6 +126,7 @@ export function PatientRosterCard({
                   <TableHead>Sex</TableHead>
                   <TableHead className="max-w-[240px]">Diagnosis</TableHead>
                   <TableHead className="text-right">ICU LOS (h)</TableHead>
+                  <TableHead className="text-right">Prediction Risk</TableHead>
                   <TableHead className="text-right">NEWS</TableHead>
                 </TableRow>
               </TableHeader>
@@ -140,6 +151,11 @@ export function PatientRosterCard({
                     <TableCell className="text-right font-tabular">
                       {row.icu_los_hours != null ? row.icu_los_hours.toFixed(1) : "—"}
                     </TableCell>
+                    <TableCell className="text-right font-tabular">
+                      {row.readmission_risk_72h != null && row.readmission_risk_72h !== undefined
+                        ? `${(row.readmission_risk_72h * 100).toFixed(1)}%`
+                        : "—"}
+                    </TableCell>
                     <TableCell className="text-right">
                       <span className="inline-flex items-center justify-end gap-2">
                         <span className="font-tabular">{row.news_total}</span>
@@ -152,7 +168,7 @@ export function PatientRosterCard({
             </Table>
             {rows.length === 0 && (
               <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-                {showFilters ? "No patients match your filters." : "No patients on the roster."}
+                {showFilters ? "No Patients Match Your Filters." : "No Patients On The Roster."}
               </p>
             )}
           </>

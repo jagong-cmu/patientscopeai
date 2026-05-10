@@ -2,8 +2,10 @@
 ML model loading, inference, and subgroup bias audit.
 Models are trained by models/train.py and saved to models/saved/.
 """
-import os
+import functools
 import json
+import os
+import threading
 import joblib
 import numpy as np
 from pathlib import Path
@@ -51,8 +53,8 @@ FEATURE_LABELS: dict[str, str] = {
 DEFINITIONS = [
     {
         "key":          "72h_unplanned_icu",
-        "definition":   "72-hour unplanned ICU readmission after hospital discharge (proxy)",
-        "methodology":  "Random Forest (sklearn Pipeline: mean imputation → RF, class_weight balanced_subsample; optional SMOTE refit when TRAIN_USE_SMOTE=1 at train time). Features from last-24h vitals + last-48h labs before ICU outtime; label excludes elective readmissions within 72h with ICU stay.",
+        "definition":   "72h ICU Readmission Score",
+        "methodology":  "Estimated from vitals (24h) and labs (48h) prior to ICU exit, compared with the training cohort.",
         "n_train":      0,
     },
 ]
@@ -61,7 +63,32 @@ DEFINITIONS = [
 # Structure: {subgroup_key: {auc, auc_overall, n, calibration_note}}
 _AUDIT_RESULTS: dict = {}
 
+_sql_engine = None
+_sql_engine_lock = threading.Lock()
 
+
+def _get_features_engine():
+    """Single pooled SQLAlchemy engine — avoids creating one engine per inference call."""
+    global _sql_engine
+    url = (os.environ.get("DATABASE_URL") or "").strip()
+    if not url:
+        return None
+    if _sql_engine is not None:
+        return _sql_engine
+    with _sql_engine_lock:
+        if _sql_engine is None:
+            from sqlalchemy import create_engine
+
+            _sql_engine = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_size=4,
+                max_overflow=8,
+            )
+    return _sql_engine
+
+
+@functools.lru_cache(maxsize=16)
 def _load_model(key: str):
     path = MODEL_DIR / f"{key}.joblib"
     if not path.exists():
@@ -69,13 +96,16 @@ def _load_model(key: str):
     return joblib.load(path)
 
 
-def _load_feature_columns(key: str) -> list[str] | None:
+@functools.lru_cache(maxsize=16)
+def _load_feature_columns(key: str) -> tuple[str, ...] | None:
     path = MODEL_DIR / f"{key}.features.json"
     if not path.exists():
         return None
-    return json.loads(path.read_text())
+    cols = json.loads(path.read_text())
+    return tuple(cols) if isinstance(cols, list) else None
 
 
+@functools.lru_cache(maxsize=16)
 def _load_train_report(key: str) -> dict | None:
     path = MODEL_DIR / f"{key}.report.json"
     if not path.exists():
@@ -86,6 +116,7 @@ def _load_train_report(key: str) -> dict | None:
         return None
 
 
+@functools.lru_cache(maxsize=16)
 def _load_explain_artifact(key: str) -> dict | None:
     path = MODEL_DIR / f"{key}.explain.json"
     if not path.exists():
@@ -120,7 +151,7 @@ def _build_risk_explanation(
     if len(names) != len(imps) or len(imps) == 0:
         return None, []
 
-    top_k = min(5, len(imps))
+    top_k = min(8, len(imps))
     top_idx = np.argsort(imps)[-top_k:][::-1]
 
     drivers: list[RiskDriverFeature] = []
@@ -196,18 +227,13 @@ def _build_risk_explanation(
             )
         )
 
-    header = (
-        "This score comes from a Random Forest trained on ICU stays with features taken from "
-        "the last 24h of vitals and 48h of labs before ICU exit. The items below are the inputs the model "
-        "weighted most strongly on average in training (mean decrease in impurity); they describe association "
-        "with the predicted probability, not proven causes."
+    # UI surfaces driver_features (vitals/labs signals); omit long RF methodology text.
+    if drivers:
+        return None, drivers
+    return (
+        "Feature drivers unavailable — ensure mimicscope.features_v1 is populated for this stay.",
+        [],
     )
-    body_parts = []
-    for d in drivers[:3]:
-        body_parts.append(f"{d.label}: {d.detail}")
-    explanation = header + (" " + " ".join(body_parts) if body_parts else "")
-
-    return explanation, drivers
 
 
 def _fetch_features_from_db(stay_id: int, feature_columns: list[str]) -> np.ndarray | None:
@@ -215,15 +241,14 @@ def _fetch_features_from_db(stay_id: int, feature_columns: list[str]) -> np.ndar
     Fetch feature row from Postgres derived view mimicscope.features_v1.
     Falls back to None if the view doesn't exist or the stay_id isn't present.
     """
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
 
-    database_url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not database_url:
+    engine = _get_features_engine()
+    if engine is None:
         return None
 
     cols_sql = ", ".join(feature_columns)
     q = text(f"SELECT {cols_sql} FROM mimicscope.features_v1 WHERE stay_id = :stay_id")
-    engine = create_engine(database_url)
     try:
         with engine.connect() as conn:
             row = conn.execute(q, {"stay_id": stay_id}).mappings().first()
@@ -243,7 +268,8 @@ def predict_risk(stay_id: int) -> RiskResponse | None:
         return None
 
     key = "72h_unplanned_icu"
-    cols = _load_feature_columns(key)
+    cols_tuple = _load_feature_columns(key)
+    cols = list(cols_tuple) if cols_tuple else []
     features = None
     if cols:
         features = _fetch_features_from_db(stay_id, cols)
@@ -265,7 +291,7 @@ def predict_risk(stay_id: int) -> RiskResponse | None:
 
         expl_text, drivers = _build_risk_explanation(
             features if features is not None else np.array([[]]),
-            cols if cols else [],
+            cols,
             explain,
             model_loaded=model is not None,
             features_available=features is not None,

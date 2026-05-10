@@ -8,7 +8,7 @@ router = APIRouter()
 @router.get("/{stay_id}", response_model=NarrativeResponse)
 def clinical_narrative(stay_id: int):
     """
-    Generate a Claude-powered clinical narrative for a patient's discharge assessment.
+    Generate Claude-powered discharge recommendations and insights for a patient's assessment.
     Every claim in the narrative is grounded in patient-specific data values.
     Also returns similar historical cases and actionable decision support suggestions.
     """

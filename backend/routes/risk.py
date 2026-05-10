@@ -20,11 +20,7 @@ def discharge_timing_panel(stay_id: int):
 
 @router.get("/{stay_id}", response_model=RiskResponse)
 def risk_panel(stay_id: int):
-    """
-    Return risk under an explicit, single definition:
-
-    - 72-hour unplanned ICU readmission after hospital discharge (proxy)
-    """
+    """Return the 72h ICU Readmission Score for this stay."""
     result = predict_risk(stay_id)
     if not result:
         raise HTTPException(status_code=404, detail=f"stay_id {stay_id} not found")

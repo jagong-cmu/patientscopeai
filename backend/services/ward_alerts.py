@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from backend.schemas import WardAlertItem, WardAlertPatientTag
+from backend.services.cohort_split import split_in_unit_vs_pending, ward_bed_capacity
 from backend.services.discharge_events_store import get_discharged_stay_ids
 from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
 from backend.services.mimic import get_labs_last48h, list_icu_stays
@@ -74,7 +75,8 @@ def _patient_tags(stay_id: int, watch_stays: set[int]) -> list[WardAlertPatientT
 
 def _ward_enriched_rows() -> list[dict]:
     discharged = get_discharged_stay_ids()
-    rows = [r for r in list_icu_stays(ICU_STAY_SCAN_LIMIT) if r["stay_id"] not in discharged]
+    raw = [r for r in list_icu_stays(ICU_STAY_SCAN_LIMIT) if r["stay_id"] not in discharged]
+    rows, _pending = split_in_unit_vs_pending(raw, ward_bed_capacity())
     enriched: list[dict] = []
     for r in rows:
         sid = int(r["stay_id"])

@@ -131,6 +131,37 @@ def validate_narrative(narrative_text: str, evidence_ids_in_input: set[str]) -> 
     return (len(issues) == 0), issues
 
 
+def validate_final_recommendations(text: str, evidence_ids_in_input: set[str]) -> tuple[bool, list[str]]:
+    """Stricter citation rules like the main narrative; allows directional discharge language."""
+    issues: list[str] = []
+
+    cited = _citation_ids_from_text(text)
+    for cid in cited:
+        if cid not in evidence_ids_in_input:
+            issues.append(f"Final recommendations cite {cid} but it does not exist in evidence.")
+
+    forbidden = [
+        (r"\bwill be readmitted\b", "Predicts readmission outcome"),
+        (r"\bwill not be readmitted\b", "Predicts readmission outcome"),
+        (r"\bexcellent care\b", "Makes care quality judgment"),
+        (r"\bsubstandard care\b", "Makes care quality judgment"),
+        (r"\binadequate care\b", "Makes care quality judgment"),
+    ]
+    for pat, msg in forbidden:
+        if re.search(pat, text, re.IGNORECASE):
+            issues.append(msg)
+
+    words = len(text.split())
+    if words > 220:
+        issues.append("Final recommendations exceed 220 word limit")
+
+    for sent in _split_sentences(text):
+        if _looks_like_clinical_claim(sent) and not _has_citation(sent):
+            issues.append(f"Clinical-claim sentence missing citation: {sent[:120]}")
+
+    return (len(issues) == 0), issues
+
+
 def _grounding_anchor(evidence_row: dict) -> str | None:
     eid = evidence_row.get("id", "")
     if eid == "ev_risk_72h_unplanned_icu":
@@ -158,10 +189,10 @@ def _compute_concordance_news(news_band: str, risk_prob: float | None) -> dict:
     prob = risk_prob if risk_prob is not None else 0.0
     if news_band == "low" and prob >= 0.25:
         pattern = "discordant_risk"
-        rationale = "NEWS aggregate is low, but model-estimated 72h unplanned ICU readmission risk is elevated."
+        rationale = "NEWS aggregate is low, but the 72h ICU Readmission Score is elevated."
     elif news_band in ("medium", "high") and prob >= 0.25:
         pattern = "aligned_concern"
-        rationale = "Elevated NEWS aligns with elevated model-estimated near-term unplanned ICU readmission risk."
+        rationale = "Elevated NEWS aligns with an elevated 72h ICU Readmission Score."
     elif news_band in ("medium", "high") and prob < 0.25:
         pattern = "monitoring_focus"
         rationale = "NEWS suggests physiological concern though near-term readmission risk estimate is not markedly elevated."
@@ -206,7 +237,7 @@ def build_structured_input(stay_id: int) -> dict:
             {
                 "id": "ev_risk_72h_unplanned_icu",
                 "feature": "risk_72h_unplanned_icu",
-                "finding": f"Model probability {risk_def.probability:.3f} for 72h unplanned ICU readmission",
+                "finding": f"72h ICU Readmission Score probability {risk_def.probability:.3f}",
                 "severity": "info",
                 "source_query": "backend/services/models.py (trained model)",
                 "source_data": {
@@ -353,11 +384,69 @@ def run_narrative_agent(structured_input: dict, skeleton: dict, issues: list[str
     return resp.content[0].text
 
 
+def run_final_recommendations_agent(
+    structured_input: dict,
+    skeleton: dict,
+    narrative: str,
+    issues: list[str] | None = None,
+) -> str:
+    """Directional discharge lean (not a substitute for clinician judgment)."""
+    client = _anthropic_client()
+    evidence_ids = [e["id"] for e in structured_input.get("evidence", [])]
+
+    system = (
+        "You are a clinical communications assistant. "
+        "Produce concise directional guidance only — not definitive orders. "
+        "Every factual clinical claim must cite evidence IDs in brackets."
+    )
+
+    prompt = {
+        "task": (
+            "Write ONE section (80–180 words) that answers: given cited NEWS and 72h readmission risk, "
+            "does the balance of evidence lean toward proceeding with discharge planning / step-down, "
+            "toward holding or optimizing care in ICU first, or is the picture mixed? "
+            "State the lean clearly and give brief reasoning. "
+            "Reference structured_input.context.ward_operational when ICU capacity affects throughput tradeoffs."
+        ),
+        "constraints": [
+            "Use bracket citations [ev_...] for every sentence that states a numeric risk, NEWS contribution, or comparable factual claim.",
+            f"Valid evidence IDs only: {evidence_ids}",
+            "Use conditional language where appropriate (e.g., consider, may warrant, leans toward).",
+            "Do not predict individual outcomes (no 'will be readmitted').",
+            "Do not claim the model is definitive — this supports clinician judgment.",
+            "Optional: 1–2 short paragraphs separated by a blank line.",
+        ],
+        "structured_input": structured_input,
+        "reasoning_skeleton": skeleton,
+        "prior_narrative_for_context": narrative[:1200],
+    }
+    if issues:
+        prompt["revision_instructions"] = {
+            "issues_found_by_validator": issues,
+            "fix": "Revise final recommendations only; keep citations valid.",
+        }
+
+    resp = client.messages.create(
+        model=_model_name(),
+        max_tokens=500,
+        system=system,
+        messages=[{"role": "user", "content": json.dumps(prompt, default=_json_default)}],
+    )
+    return resp.content[0].text
+
+
 def generate_narrative_with_guardrails(stay_id: int, max_retries: int = 2) -> NarrativeResponse:
     structured = build_structured_input(stay_id)
     evidence_ids = {e["id"] for e in structured.get("evidence", [])}
 
-    cache_key = _hash_json({"stay_id": stay_id, "structured": structured, "model": _model_name()})
+    cache_key = _hash_json(
+        {
+            "stay_id": stay_id,
+            "structured": structured,
+            "model": _model_name(),
+            "format_version": "final_recommendations_v1",
+        }
+    )
     cache_path = CACHE_DIR / f"{cache_key}.json"
     _safe_mkdir(CACHE_DIR)
     if cache_path.exists():
@@ -374,20 +463,37 @@ def generate_narrative_with_guardrails(stay_id: int, max_retries: int = 2) -> Na
         if ok:
             break
 
-    citations_used = sorted(set(_citation_ids_from_text(narrative)))
+    fr_issues: list[str] = []
+    final_recommendations = ""
+    for attempt in range(max_retries + 1):
+        final_recommendations = run_final_recommendations_agent(
+            structured,
+            skeleton,
+            narrative,
+            fr_issues if attempt > 0 else None,
+        )
+        ok_fr, fr_issues = validate_final_recommendations(final_recommendations, evidence_ids)
+        if ok_fr:
+            break
+
+    citations_used = sorted(
+        set(_citation_ids_from_text(narrative)) | set(_citation_ids_from_text(final_recommendations))
+    )
     suggestions = []
     for p in structured["news"]["parameters"]:
         if int(p.get("points", 0)) >= 2:
             eid = p.get("evidence_id") or f"ev_news_{p.get('name', '')}"
             suggestions.append(f"Consider clinical review of {p.get('label', 'parameter')} — see [{eid}]")
 
+    combined_issues = list(issues or []) + list(fr_issues or [])
     result = NarrativeResponse(
         stay_id=stay_id,
         narrative=narrative,
+        final_recommendations=final_recommendations if final_recommendations.strip() else None,
         similar_cases=[SimilarCase(**c) if isinstance(c, dict) else c for c in structured.get("similar_cases", [])],
         suggestions=suggestions,
         citations_used=citations_used,
-        validation_issues=issues if issues else None,
+        validation_issues=combined_issues if combined_issues else None,
         reasoning_skeleton=skeleton,
         grounding_evidence=_grounding_evidence_list(structured),
         concordance_signal=structured.get("concordance_signal"),

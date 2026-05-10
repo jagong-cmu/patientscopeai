@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import PatientDetailPage from "./pages/PatientDetailPage";
 import PatientsListPage from "./pages/PatientsListPage";
 import WardOverviewPage from "./pages/WardOverviewPage";
@@ -28,6 +29,7 @@ function LegacyWatchlistRedirect() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={200}>
       <SidebarProvider>
         <BrowserRouter>
           <Toaster richColors position="top-center" />
@@ -42,6 +44,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </SidebarProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

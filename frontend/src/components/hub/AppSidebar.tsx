@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { label: "Ward overview", icon: LayoutDashboard, to: "/", end: true },
+  { label: "Ward Overview", icon: LayoutDashboard, to: "/", end: true },
   { label: "Patients", icon: Users, to: "/patients", end: true },
-  { label: "Post-monitoring", icon: Eye, to: "/post-monitoring", end: true },
+  { label: "Post-Monitoring", icon: Eye, to: "/post-monitoring", end: true },
 ] as const;
 
 function SidebarNavItem({
@@ -54,7 +54,7 @@ export function ClinicalSidebar() {
           </div>
           <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
             <p className="truncate text-sm font-semibold">PatientScope</p>
-            <p className="truncate text-xs text-muted-foreground">ICU support</p>
+            <p className="truncate text-xs text-muted-foreground">ICU Support</p>
           </div>
         </div>
       </SidebarHeader>

@@ -17,7 +17,7 @@ import { apiGet, apiPost } from "../api/client";
 import { NarrativeBlock } from "../components/NarrativeBlock";
 import { NewsScorePanel } from "../components/NewsScorePanel";
 import { DischargeTimingPanel } from "../components/DischargeTimingPanel";
-import { RiskAndContextPanel } from "../components/RiskAndContextPanel";
+import { RiskProjectionPanel } from "../components/RiskProjectionPanel";
 import { VitalsCombinedPanel } from "../components/VitalsCombinedPanel";
 import { HubLayout } from "../components/hub/HubLayout";
 import { NarrativeLoading } from "../components/NarrativeLoading";
@@ -159,7 +159,7 @@ export default function PatientDetailPage() {
 
   if (invalid) {
     return (
-      <HubLayout title="Invalid stay">
+      <HubLayout title="Invalid Stay">
         <p className="text-sm text-critical">
           Bad stay id.{" "}
           <Link className={backLinkClass} to="/patients">
@@ -235,7 +235,7 @@ export default function PatientDetailPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Record discharge destination</DialogTitle>
+            <DialogTitle>Record Discharge Destination</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <RadioGroup value={dischargeDest} onValueChange={setDischargeDest} className="gap-3">
@@ -315,7 +315,7 @@ export default function PatientDetailPage() {
       {!loadingCore && !errCore && patient && newsQ.data && (
         <div className="space-y-6 animate-in fade-in-0 duration-300">
           {/*
-            Single 2×2 grid: summary↔risk & timing, narrative↔NEWS (paired row heights).
+            Row 1: patient summary (includes NEWS) ↔ risk & timing. Row 2: AI discharge recommendation full width, centered.
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
             <div
@@ -342,7 +342,7 @@ export default function PatientDetailPage() {
                           setDischargeOpen(true);
                         }}
                       >
-                        Discharge patient
+                        Discharge Patient
                       </Button>
                     ) : (
                       <p className="max-w-sm text-right text-xs text-muted-foreground">
@@ -402,10 +402,17 @@ export default function PatientDetailPage() {
                     </div>
                   </div>
                   <div className="shrink-0 rounded-lg border border-border bg-secondary/20 p-4 md:p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary diagnosis</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary Diagnosis</p>
                     <p className="mt-2 text-sm leading-relaxed text-foreground">
                       {patient.primary_diagnosis ?? "Not available"}
                     </p>
+                  </div>
+
+                  <div className="shrink-0 border-t border-border pt-6">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NEWS</p>
+                    <div className="mt-3">
+                      <NewsScorePanel data={newsQ.data} compact embedded />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -413,14 +420,10 @@ export default function PatientDetailPage() {
 
             <aside ref={riskAsideRef} className="flex min-h-0 flex-col gap-3 lg:min-w-0">
               <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Risk &amp; timing
+                Risk &amp; Timing
               </h2>
               <div className="flex min-h-0 flex-1 flex-col gap-4">
-                <RiskAndContextPanel
-                  risk={riskQ.data}
-                  narrative={narrativeVisible ?? undefined}
-                  narrativeLoading={narrativeMut.isPending}
-                />
+                <RiskProjectionPanel risk={riskQ.data} className="min-h-[280px]" />
                 {hasTimingContent && (
                   <Card className="shadow-[var(--shadow-card)]">
                     <CardContent className="space-y-2 pt-4">
@@ -437,10 +440,15 @@ export default function PatientDetailPage() {
               </div>
             </aside>
 
-            <section className="lg:min-w-0">
-              <Card className="shadow-[var(--shadow-card)]">
-                <CardContent className="flex flex-col items-center gap-4 px-6 py-6">
-                  <h2 className="text-sm font-semibold text-foreground">Clinical narrative</h2>
+            <section className="flex flex-col items-center text-center lg:col-span-2">
+              <Card className="w-full max-w-3xl shadow-[var(--shadow-card)]">
+                <CardContent className="flex flex-col items-center gap-5 px-6 py-10">
+                  <h2 className="text-base font-semibold text-foreground">
+                    AI discharge recommendations and insights
+                  </h2>
+                  <p className="max-w-lg text-sm text-muted-foreground">
+                    Synthesized from NEWS, risk projection, and structured ICU context — for clinician review only.
+                  </p>
                   <Button
                     type="button"
                     size="lg"
@@ -449,29 +457,30 @@ export default function PatientDetailPage() {
                     className="w-full max-w-md transition-transform active:scale-[0.98] disabled:active:scale-100"
                     onClick={() => narrativeMut.mutate()}
                   >
-                    {narrativeBusy ? "Generating…" : narrativeVisible ? "Regenerate" : "Generate narrative"}
+                    {narrativeBusy
+                      ? "Generating…"
+                      : narrativeVisible
+                        ? "Regenerate Recommendation"
+                        : "Generate Recommendation"}
                   </Button>
                 </CardContent>
               </Card>
               {narrativeMut.isError && (
-                <p className="mt-3 text-sm text-critical">{(narrativeMut.error as Error).message}</p>
+                <p className="mt-4 max-w-xl text-sm text-critical">{(narrativeMut.error as Error).message}</p>
               )}
               {(narrativeMut.isPending || narrativeRevealPending) && (
-                <div className="mt-4">
-                  <NarrativeLoading />
+                <div className="mt-6 flex w-full justify-center">
+                  <div className="w-full max-w-3xl">
+                    <NarrativeLoading />
+                  </div>
                 </div>
               )}
               {narrativeVisible && !narrativeBusy && (
-                <div className="mt-4">
+                <div className="mt-8 w-full max-w-3xl text-left">
                   <NarrativeBlock data={narrativeVisible} />
                 </div>
               )}
             </section>
-
-            <div className="space-y-2 lg:min-w-0">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NEWS</h2>
-              <NewsScorePanel data={newsQ.data} compact />
-            </div>
           </div>
 
           <section className="space-y-3">
