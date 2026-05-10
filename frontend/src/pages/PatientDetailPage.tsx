@@ -35,7 +35,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const DISCHARGE_DESTINATIONS = [
   { value: "general_ward", label: "General Ward" },
@@ -186,6 +186,40 @@ export default function PatientDetailPage() {
 
   const narrativeBusy = narrativeMut.isPending || narrativeRevealPending;
 
+  const riskAsideRef = useRef<HTMLElement>(null);
+  const [riskAsidePx, setRiskAsidePx] = useState<number | undefined>(undefined);
+  const [lgUp, setLgUp] = useState(false);
+
+  useLayoutEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setLgUp(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = riskAsideRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setRiskAsidePx(Math.round(el.getBoundingClientRect().height));
+    });
+    ro.observe(el);
+    setRiskAsidePx(Math.round(el.getBoundingClientRect().height));
+    return () => ro.disconnect();
+  }, [
+    patient?.subject_id,
+    hasTimingContent,
+    timingLoading,
+    timingData,
+    riskQ.data,
+    narrativeVisible,
+    narrativeMut.isPending,
+  ]);
+
+  const summaryColumnSyncStyle =
+    lgUp && riskAsidePx != null ? ({ height: riskAsidePx, maxHeight: riskAsidePx } as const) : undefined;
+
   return (
     <HubLayout
       title={`${displayPatient} · Stay ${id}`}
@@ -284,110 +318,122 @@ export default function PatientDetailPage() {
             Single 2×2 grid: summary↔risk & timing, narrative↔NEWS (paired row heights).
           */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
-            <Card className="overflow-hidden shadow-[var(--shadow-card)] lg:min-w-0">
-              <CardHeader className="border-b border-border bg-muted/20 pb-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-xl">{displayPatient}</CardTitle>
-                    <CardDescription className="mt-1">ICU stay {id}</CardDescription>
+            <div
+              className="flex min-h-0 flex-col gap-3 lg:min-w-0"
+              style={summaryColumnSyncStyle}
+            >
+              <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Patient Summary
+              </h2>
+              <Card className="flex min-h-0 flex-1 flex-col overflow-hidden shadow-[var(--shadow-card)]">
+                <CardHeader className="shrink-0 border-b border-border bg-muted/20 pb-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-xl">{displayPatient}</CardTitle>
+                      <CardDescription className="mt-1 text-sm">ICU stay {id}</CardDescription>
+                    </div>
+                    {!patient.discharged_from_icu ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setPostMonitorAfterDischarge(false);
+                          setDischargeOpen(true);
+                        }}
+                      >
+                        Discharge patient
+                      </Button>
+                    ) : (
+                      <p className="max-w-sm text-right text-xs text-muted-foreground">
+                        Discharge recorded — removed from ICU census
+                        {patient.post_monitoring ? " · post-monitoring" : ""}
+                      </p>
+                    )}
                   </div>
-                  {!patient.discharged_from_icu ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        setPostMonitorAfterDischarge(false);
-                        setDischargeOpen(true);
-                      }}
-                    >
-                      Discharge patient
-                    </Button>
-                  ) : (
-                    <p className="max-w-sm text-right text-xs text-muted-foreground">
-                      Discharge recorded — removed from ICU census
-                      {patient.post_monitoring ? " · post-monitoring" : ""}
+                </CardHeader>
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain pt-6">
+                  <div className="grid gap-5 md:grid-cols-2 md:gap-8">
+                    <div className="space-y-3 text-sm leading-snug">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demographics</p>
+                      <dl className="grid gap-3">
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Age</dt>
+                          <dd className="font-tabular font-medium text-foreground">{patient.age_years?.toFixed(0) ?? "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Sex</dt>
+                          <dd className="text-foreground">{patient.gender ?? "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Race / ethnicity</dt>
+                          <dd className="text-right text-foreground">{patient.race ?? "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Insurance</dt>
+                          <dd className="text-right text-foreground">{patient.insurance ?? "—"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div className="space-y-3 text-sm leading-snug">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stay</p>
+                      <dl className="grid gap-3">
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">ICU LOS</dt>
+                          <dd className="font-tabular font-medium text-foreground">
+                            {patient.icu_los_hours != null ? `${patient.icu_los_hours.toFixed(1)} h` : "—"}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Hospital LOS</dt>
+                          <dd className="font-tabular font-medium text-foreground">
+                            {patient.hospital_los_hours != null ? `${patient.hospital_los_hours.toFixed(1)} h` : "—"}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Unit</dt>
+                          <dd className="text-right text-foreground">{patient.first_careunit ?? "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt className="text-muted-foreground">Disposition</dt>
+                          <dd className="text-right text-foreground">{patient.discharge_location ?? "—"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                  <div className="shrink-0 rounded-lg border border-border bg-secondary/20 p-4 md:p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary diagnosis</p>
+                    <p className="mt-2 text-sm leading-relaxed text-foreground">
+                      {patient.primary_diagnosis ?? "Not available"}
                     </p>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
-                <div className="space-y-3 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demographics</p>
-                  <dl className="grid gap-2">
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Age</dt>
-                      <dd className="font-tabular font-medium">{patient.age_years?.toFixed(0) ?? "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Sex</dt>
-                      <dd>{patient.gender ?? "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Race / ethnicity</dt>
-                      <dd className="text-right">{patient.race ?? "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Insurance</dt>
-                      <dd className="text-right">{patient.insurance ?? "—"}</dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="space-y-3 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stay</p>
-                  <dl className="grid gap-2">
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">ICU LOS</dt>
-                      <dd className="font-tabular font-medium">
-                        {patient.icu_los_hours != null ? `${patient.icu_los_hours.toFixed(1)} h` : "—"}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Hospital LOS</dt>
-                      <dd className="font-tabular font-medium">
-                        {patient.hospital_los_hours != null ? `${patient.hospital_los_hours.toFixed(1)} h` : "—"}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Unit</dt>
-                      <dd className="text-right">{patient.first_careunit ?? "—"}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Disposition</dt>
-                      <dd className="text-right">{patient.discharge_location ?? "—"}</dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="md:col-span-2 rounded-lg border border-border bg-secondary/20 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary diagnosis</p>
-                  <p className="mt-2 text-sm leading-relaxed text-foreground">
-                    {patient.primary_diagnosis ?? "Not available"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            <aside className="space-y-4 lg:min-w-0">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <aside ref={riskAsideRef} className="flex min-h-0 flex-col gap-3 lg:min-w-0">
+              <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Risk &amp; timing
               </h2>
-              <RiskAndContextPanel
-                risk={riskQ.data}
-                narrative={narrativeVisible ?? undefined}
-                narrativeLoading={narrativeMut.isPending}
-              />
-              {hasTimingContent && (
-                <Card className="shadow-[var(--shadow-card)]">
-                  <CardContent className="space-y-2 pt-4">
-                    {timingLoading && <p className="text-[11px] text-muted-foreground">Loading…</p>}
-                    {timingErr && (
-                      <p className="text-[11px] text-critical">Discharge timing unavailable.</p>
-                    )}
-                    {(timingData?.scenarios?.length ?? 0) > 0 ? (
-                      <DischargeTimingPanel data={timingData} />
-                    ) : null}
-                  </CardContent>
-                </Card>
-              )}
+              <div className="flex min-h-0 flex-1 flex-col gap-4">
+                <RiskAndContextPanel
+                  risk={riskQ.data}
+                  narrative={narrativeVisible ?? undefined}
+                  narrativeLoading={narrativeMut.isPending}
+                />
+                {hasTimingContent && (
+                  <Card className="shadow-[var(--shadow-card)]">
+                    <CardContent className="space-y-2 pt-4">
+                      {timingLoading && <p className="text-[11px] text-muted-foreground">Loading…</p>}
+                      {timingErr && (
+                        <p className="text-[11px] text-critical">Discharge timing unavailable.</p>
+                      )}
+                      {(timingData?.scenarios?.length ?? 0) > 0 ? (
+                        <DischargeTimingPanel data={timingData} />
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </aside>
 
             <section className="space-y-3 lg:min-w-0">

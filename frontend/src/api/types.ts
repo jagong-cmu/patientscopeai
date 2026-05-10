@@ -41,12 +41,15 @@ export interface WardSummaryResponse {
 
 export type WardAlertCategory = "lab_trajectory" | "news_context";
 
+export type WardAlertPatientTag = "icu" | "post_monitoring";
+
 export interface WardAlertItem {
   id: string;
   category: WardAlertCategory;
   message: string;
   occurred_at: string;
   stay_id?: number | null;
+  tags?: WardAlertPatientTag[];
 }
 
 export interface WardAlertsResponse {

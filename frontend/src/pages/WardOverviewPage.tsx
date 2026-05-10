@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type {
@@ -21,13 +21,10 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 function newsSquareClass(band: NewsClinicalBand) {
   switch (band) {
@@ -44,6 +41,9 @@ function newsSquareClass(band: NewsClinicalBand) {
 
 const patientLinkClass =
   "font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline";
+
+/** Sort tiles: green cluster first, then amber, then red (stable by stay id). */
+const BAND_SORT: Record<NewsClinicalBand, number> = { low: 0, medium: 1, high: 2 };
 
 export default function WardOverviewPage() {
   const subtitle = new Intl.DateTimeFormat(undefined, {
@@ -79,6 +79,42 @@ export default function WardOverviewPage() {
     return m;
   }, [stays]);
 
+  const staysSortedForGrid = useMemo(() => {
+    return [...stays].sort((a, b) => {
+      const d = BAND_SORT[a.news_band] - BAND_SORT[b.news_band];
+      if (d !== 0) return d;
+      return a.stay_id - b.stay_id;
+    });
+  }, [stays]);
+
+  const alertsCardRef = useRef<HTMLDivElement>(null);
+  const [alertsHeightPx, setAlertsHeightPx] = useState<number | undefined>(undefined);
+  const [lgUp, setLgUp] = useState(false);
+
+  useLayoutEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setLgUp(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = alertsCardRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setAlertsHeightPx(Math.round(el.getBoundingClientRect().height));
+    });
+    ro.observe(el);
+    setAlertsHeightPx(Math.round(el.getBoundingClientRect().height));
+    return () => ro.disconnect();
+  }, [data, alertsQ.data, alertsQ.isLoading, alertsQ.isError]);
+
+  const bedCardSyncStyle =
+    lgUp && alertsHeightPx != null
+      ? ({ height: alertsHeightPx, maxHeight: alertsHeightPx } as const)
+      : undefined;
+
   return (
     <HubLayout title="Ward overview" subtitle={subtitle}>
       {wardQ.isLoading && (
@@ -107,16 +143,19 @@ export default function WardOverviewPage() {
       {data && (
         <div className="space-y-6">
           <div className="grid gap-6 animate-in fade-in-0 duration-300 lg:grid-cols-2 lg:items-start">
-            <Card className="shadow-[var(--shadow-card)]">
-              <CardHeader className="pb-2">
+            <Card
+              className="flex min-h-0 flex-col overflow-hidden shadow-[var(--shadow-card)]"
+              style={bedCardSyncStyle}
+            >
+              <CardHeader className="shrink-0 pb-2">
                 <CardTitle className="text-lg">Bed utilization</CardTitle>
                 <CardDescription>
                   {data.census_count} patients · {data.pending_admissions_count} pending admission
                   {data.pending_admissions_count === 1 ? "" : "s"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-end gap-6">
+              <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+                <div className="flex shrink-0 flex-wrap items-end gap-6">
                   <div>
                     <p className="text-4xl font-semibold tabular-nums tracking-tight">
                       {data.census_count}
@@ -131,52 +170,59 @@ export default function WardOverviewPage() {
                   </div>
                 </div>
 
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-foreground hover:underline">
-                    <ChevronDown className="size-4 transition-transform [[data-state=open]_&]:rotate-180" />
-                    NEWS distribution & grid
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-4 space-y-3">
-                    <p className="text-xs text-muted-foreground">
+                <div className="flex min-h-0 flex-1 flex-col gap-3 border-t border-border pt-4">
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">NEWS distribution</h3>
+                    <p className="text-xs tabular-nums text-muted-foreground">
                       Low {bandCounts.low} · Medium {bandCounts.medium} · High {bandCounts.high}
                     </p>
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-success" aria-hidden />
-                        Low
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-warning" aria-hidden />
-                        Medium
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-sm bg-critical" aria-hidden />
-                        High
-                      </span>
-                    </div>
-                    {staysQ.isLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading roster for grid…</p>
-                    ) : (
-                      <div className="grid max-h-48 grid-cols-[repeat(auto-fill,minmax(1.25rem,1fr))] gap-1 overflow-y-auto sm:max-h-none">
-                        {stays.map((row) => (
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2.5 rounded-sm bg-success" aria-hidden />
+                      Low
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2.5 rounded-sm bg-warning" aria-hidden />
+                      Medium
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2.5 rounded-sm bg-critical" aria-hidden />
+                      High
+                    </span>
+                  </div>
+
+                  {staysQ.isLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading roster for grid…</p>
+                  ) : (
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+                      <div
+                        className={cn(
+                          "grid w-full gap-1",
+                          "grid-cols-[repeat(auto-fill,minmax(1.625rem,1fr))]",
+                          "sm:grid-cols-[repeat(auto-fill,minmax(1.75rem,1fr))]",
+                        )}
+                      >
+                        {staysSortedForGrid.map((row) => (
                           <Link
                             key={row.stay_id}
                             to={`/patients/${row.stay_id}`}
                             title={`${row.display_patient_id} · NEWS ${row.news_total}`}
                             className={cn(
-                              "size-5 shrink-0 rounded-sm shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              "block aspect-square w-full min-h-[1.625rem] rounded-sm shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[1.75rem]",
                               newsSquareClass(row.news_band),
                             )}
                           />
                         ))}
                       </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-[var(--shadow-card)]">
+            <Card ref={alertsCardRef} className="shadow-[var(--shadow-card)]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Critical alerts</CardTitle>
                 <CardDescription>Labs and monitored patients</CardDescription>
@@ -194,21 +240,50 @@ export default function WardOverviewPage() {
                     {alertsQ.data.alerts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No critical alerts right now.</p>
                     ) : (
-                      <ul className="max-h-64 space-y-3 overflow-y-auto text-sm">
+                      <ul className="max-h-96 space-y-3 overflow-y-auto overscroll-contain pr-1">
                         {alertsQ.data.alerts.map((a) => (
-                          <li key={a.id} className="border-b border-border pb-3 last:border-0">
-                            <p className="text-foreground">{a.message}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {new Date(a.occurred_at).toLocaleString()}
-                              {a.stay_id != null ? (
-                                <>
-                                  {" · "}
-                                  <Link className={patientLinkClass} to={`/patients/${a.stay_id}`}>
-                                    Open stay
-                                  </Link>
-                                </>
-                              ) : null}
-                            </p>
+                          <li key={a.id} className="list-none">
+                            <Alert
+                              variant="destructive"
+                              className={cn(
+                                "relative overflow-hidden border-critical/50 bg-critical/[0.08] py-3 text-foreground shadow-md shadow-critical/20 [&>svg]:text-critical",
+                                "before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-critical",
+                                "dark:border-critical/60 dark:bg-critical/15 dark:shadow-critical/25",
+                              )}
+                            >
+                              <AlertTriangle className="text-critical" aria-hidden />
+                              <AlertDescription className="space-y-2 !text-foreground [&_a]:text-primary">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                  <p className="text-sm leading-snug">{a.message}</p>
+                                  <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                                    {(a.tags ?? []).includes("icu") ? (
+                                      <Badge variant="secondary" className="text-[10px] font-medium uppercase tracking-wide">
+                                        ICU ward
+                                      </Badge>
+                                    ) : null}
+                                    {(a.tags ?? []).includes("post_monitoring") ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="border-primary/45 text-[10px] font-medium uppercase tracking-wide"
+                                      >
+                                        Post-monitoring
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(a.occurred_at).toLocaleString()}
+                                  {a.stay_id != null ? (
+                                    <>
+                                      {" · "}
+                                      <Link className={patientLinkClass} to={`/patients/${a.stay_id}`}>
+                                        Open stay
+                                      </Link>
+                                    </>
+                                  ) : null}
+                                </p>
+                              </AlertDescription>
+                            </Alert>
                           </li>
                         ))}
                       </ul>
