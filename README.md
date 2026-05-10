@@ -1,6 +1,6 @@
-# PatientScope AI
+# 🏥 PatientScope AI
 
-## Inspiration
+## 💡 Inspiration
 
 This project grew out of an **AI in Healthcare Applications** course I took at Carnegie Mellon, where I dug into the gap between what clinical ML promises and what actually reaches the bedside. Around the same time, I started working hands-on with the [MIMIC-IV demo dataset](https://physionet.org/content/mimic-iv-demo/) — reconstructing ICU cohorts via chained CTEs, reproducing published prediction pipelines, and seeing up close how messy real critical-care data actually is.
 
@@ -8,17 +8,17 @@ What kept pulling at me was the readmission problem. ICU discharge is one of the
 
 Existing risk tools collapse this whole decision into a single opaque vendor score, which is exactly the kind of "trust me bro" output the CMU course had taught me to be skeptical of. **PatientScope AI** is what happens when those threads meet. I wanted decision support that grounds every claim in cohort definitions and source data, surfaces multiple readmission definitions instead of one incomparable rate, and gives the discharge team something they can actually argue with — less black-box probability, more clinical reasoning at the bedside.
 
-## What it does
+## ✨ What it does
 
 PatientScope is a clinical-style ICU dashboard backed by MIMIC-style ICU stays in PostgreSQL:
 
-- **Ward / census views** — roster and summaries over ICU stays, with connectivity and latency surfaced to the UI via `GET /api/status` (no silent failures hiding behind a green checkmark).
-- **Per-stay assessment** — NEWS-style readiness scoring, multi-definition readmission framing (several operational definitions documented in SQL/docs rather than collapsed into one incomparable rate), and 72-hour readmission risk from a trained scikit-learn Random Forest pipeline served via the API.
-- **Vitals and trajectories** — structured pulls from MIMIC-like schemas powering charts and panels.
-- **Narrative layer** — Anthropic Claude generates clinician-facing narrative text using a tool-use pattern, with optional persistence and audit paths wired toward MongoDB Atlas.
-- **Methodology exposure** — the UI puts methodology and limitations front and center, so reviewers see what was measured, how, and where it falls short.
+- 🛏️ **Ward / census views** — roster and summaries over ICU stays, with connectivity and latency surfaced to the UI via `GET /api/status` (no silent failures hiding behind a green checkmark).
+- 📊 **Per-stay assessment** — NEWS-style readiness scoring, multi-definition readmission framing (several operational definitions documented in SQL/docs rather than collapsed into one incomparable rate), and 72-hour readmission risk from a trained scikit-learn Random Forest pipeline served via the API.
+- 💓 **Vitals and trajectories** — structured pulls from MIMIC-like schemas powering charts and panels.
+- 🤖 **Narrative layer** — Anthropic Claude generates clinician-facing narrative text using a tool-use pattern, with optional persistence and audit paths wired toward MongoDB Atlas.
+- 📖 **Methodology exposure** — the UI puts methodology and limitations front and center, so reviewers see what was measured, how, and where it falls short.
 
-## How I built it
+## 🛠️ How I built it
 
 **Data & SQL.** Loaded MIMIC-IV demo into Postgres using MIT-LCP-style build scripts (create → load → constraints → indexes), with cohort and outcome SQL in `sql/cohort_icu_baseline.sql`, `sql/outcomes_readmission_mimic_demo.sql`, and `sql/mimicscope_build_v1.sql`. Feature snapshots align to ICU windows for modeling and discharge-timing sensitivity analysis.
 
@@ -30,29 +30,29 @@ PatientScope is a clinical-style ICU dashboard backed by MIMIC-style ICU stays i
 
 **Ops.** API runs under uvicorn; production pattern is reverse proxy (nginx) → `127.0.0.1:8000` with TLS, separate from static hosting.
 
-## Challenges I ran into
+## ⚠️ Challenges I ran into
 
-- **Split hosting.** Vercel serves only static assets unless I bring my own backend, and `VITE_API_BASE` has to match the real API origin or the browser cheerfully calls the wrong host (e.g. apex 307s to www and gets HTML when it asked for JSON).
-- **HTTPS / mixed content.** A SPA served over HTTPS demands an HTTPS API; raw `http://IP:port` gets a polite "no" from the browser.
-- **Postgres on the server.** `database_ok: false` every time `DATABASE_URL` / `POSTGRES_*` disagreed with how Postgres was actually exposed — demo defaults used 5433 locally vs. 5432 on the VM, which is the kind of one-character difference that eats an hour.
-- **Packaging vs. platforms.** Backend lives under `backend/` instead of root `api/` to sidestep Vercel's reserved serverless convention. Naming things is hard; naming things in a way that doesn't anger your hosting platform is harder.
+- 🌐 **Split hosting.** Vercel serves only static assets unless I bring my own backend, and `VITE_API_BASE` has to match the real API origin or the browser cheerfully calls the wrong host (e.g. apex 307s to www and gets HTML when it asked for JSON).
+- 🔒 **HTTPS / mixed content.** A SPA served over HTTPS demands an HTTPS API; raw `http://IP:port` gets a polite "no" from the browser.
+- 🗄️ **Postgres on the server.** `database_ok: false` every time `DATABASE_URL` / `POSTGRES_*` disagreed with how Postgres was actually exposed — demo defaults used 5433 locally vs. 5432 on the VM, which is the kind of one-character difference that eats an hour.
+- 📦 **Packaging vs. platforms.** Backend lives under `backend/` instead of root `api/` to sidestep Vercel's reserved serverless convention. Naming things is hard; naming things in a way that doesn't anger your hosting platform is harder.
 
-## Accomplishments that I'm proud of
+## 🏆 Accomplishments that I'm proud of
 
-- End-to-end SQL → features → sklearn pipeline → API → React UI on realistic ICU schemas, all wired together and actually talking to each other.
-- Explicit cohort and outcome documentation, plus multi-definition readmission thinking — no hidden composite score doing the heavy lifting.
-- A polished hub UI with typed client code and modular FastAPI design that holds up under judge inspection.
-- Operational honesty: status endpoints and methodology views that admit what's uncertain rather than papering over it.
+- 🔗 End-to-end SQL → features → sklearn pipeline → API → React UI on realistic ICU schemas, all wired together and actually talking to each other.
+- 📋 Explicit cohort and outcome documentation, plus multi-definition readmission thinking — no hidden composite score doing the heavy lifting.
+- ✨ A polished hub UI with typed client code and modular FastAPI design that holds up under judge inspection.
+- 🎯 Operational honesty: status endpoints and methodology views that admit what's uncertain rather than papering over it.
 
-## What I learned
+## 📚 What I learned
 
-- **Environment parity matters.** Local Docker on 5433, VM on 5432, and `DATABASE_URL` all have to agree, or `/api/status` lies quietly while the API still "runs."
-- **Frontend env is build-time.** `VITE_*` variables require a redeploy after changes — easy to forget at 3 AM under hackathon time pressure.
-- **Platform boundaries are real.** Static hosts excel at the UI; long-lived FastAPI + Postgres belongs on a small VM or managed container host, not bolted onto a static CDN through sheer optimism.
+- 🔧 **Environment parity matters.** Local Docker on 5433, VM on 5432, and `DATABASE_URL` all have to agree, or `/api/status` lies quietly while the API still "runs."
+- ⏱️ **Frontend env is build-time.** `VITE_*` variables require a redeploy after changes — easy to forget at 3 AM under hackathon time pressure.
+- 🧱 **Platform boundaries are real.** Static hosts excel at the UI; long-lived FastAPI + Postgres belongs on a small VM or managed container host, not bolted onto a static CDN through sheer optimism.
 
-## What's next for PatientScope AI
+## 🚀 What's next for PatientScope AI
 
-- Harden production paths: managed Postgres (or persistent Neon), secrets rotation, tighter CORS than `*`, and structured logging.
-- Credentialed MIMIC-IV / BigQuery paths for training parity with the `TRAINING_PARQUET` workflows already sketched in `models/train.py`.
-- Stronger validation: calibration plots and notebook-backed audits aligned with `docs/scoring_rubric.md`.
-- Optional consolidation: migrate API to Railway, Render, Fly, or Cloud Run to avoid self-managing VMs while keeping the FastAPI codebase intact.
+- 🔐 Harden production paths: managed Postgres (or persistent Neon), secrets rotation, tighter CORS than `*`, and structured logging.
+- 📈 Credentialed MIMIC-IV / BigQuery paths for training parity with the `TRAINING_PARQUET` workflows already sketched in `models/train.py`.
+- ✅ Stronger validation: calibration plots and notebook-backed audits aligned with `docs/scoring_rubric.md`.
+- ☁️ Optional consolidation: migrate API to Railway, Render, Fly, or Cloud Run to avoid self-managing VMs while keeping the FastAPI codebase intact.
