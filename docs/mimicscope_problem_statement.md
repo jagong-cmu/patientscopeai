@@ -20,6 +20,12 @@ Full MIMIC-IV (credentialled) generalizes methodology; **demo v2.2** (~100 patie
 
 Real ICU discharge combines physiology, trajectory, bed pressure, and handoff quality. MimicScope is **decision support**, not a replacement for judgment—aligned with the contrast your team described vs opaque vendor scores.
 
+## Snapshot risk vs discharge timing sensitivity
+
+The **72-hour readmission probability** from the Random Forest model uses **one feature snapshot per stay**, aligned with vitals/labs windows ending at ICU **outtime** (see `sql/mimicscope_build_v1.sql`). That number answers “given how this stay looked **at exit**, what risk does the model assign?”
+
+The **discharge timing sensitivity** view replays the **same model** on **counterfactual** feature rows that heuristically encode “what if discharge were **now** vs delayed **12h / 24h**?” (adjusted LOS, extrapolated creatinine/BUN along stored slopes, damped vital stabilization). This is **exploratory sensitivity analysis** for premature-discharge conversations — **not** a second validated model of how risk evolves in real time, and **not** a replacement for the primary outcome definition.
+
 ## Next steps (checklist)
 
 - [ ] Confirm Postgres + demo load (`scripts/setup_mimic_demo.sh`).

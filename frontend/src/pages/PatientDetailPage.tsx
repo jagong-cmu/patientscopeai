@@ -336,6 +336,7 @@ export default function PatientDetailPage() {
                       <Button
                         type="button"
                         size="sm"
+                        className="transition-transform active:scale-[0.98]"
                         onClick={() => {
                           setPostMonitorAfterDischarge(false);
                           setDischargeOpen(true);
@@ -436,24 +437,35 @@ export default function PatientDetailPage() {
               </div>
             </aside>
 
-            <section className="space-y-3 lg:min-w-0">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-foreground">Clinical narrative</h2>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={narrativeVisible ? "outline" : "default"}
-                  disabled={narrativeBusy}
-                  onClick={() => narrativeMut.mutate()}
-                >
-                  {narrativeBusy ? "Generating…" : narrativeVisible ? "Regenerate" : "Generate narrative"}
-                </Button>
-              </div>
+            <section className="lg:min-w-0">
+              <Card className="shadow-[var(--shadow-card)]">
+                <CardContent className="flex flex-col items-center gap-4 px-6 py-6">
+                  <h2 className="text-sm font-semibold text-foreground">Clinical narrative</h2>
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant={narrativeVisible ? "outline" : "default"}
+                    disabled={narrativeBusy}
+                    className="w-full max-w-md transition-transform active:scale-[0.98] disabled:active:scale-100"
+                    onClick={() => narrativeMut.mutate()}
+                  >
+                    {narrativeBusy ? "Generating…" : narrativeVisible ? "Regenerate" : "Generate narrative"}
+                  </Button>
+                </CardContent>
+              </Card>
               {narrativeMut.isError && (
-                <p className="text-sm text-critical">{(narrativeMut.error as Error).message}</p>
+                <p className="mt-3 text-sm text-critical">{(narrativeMut.error as Error).message}</p>
               )}
-              {(narrativeMut.isPending || narrativeRevealPending) && <NarrativeLoading />}
-              {narrativeVisible && !narrativeBusy && <NarrativeBlock data={narrativeVisible} />}
+              {(narrativeMut.isPending || narrativeRevealPending) && (
+                <div className="mt-4">
+                  <NarrativeLoading />
+                </div>
+              )}
+              {narrativeVisible && !narrativeBusy && (
+                <div className="mt-4">
+                  <NarrativeBlock data={narrativeVisible} />
+                </div>
+              )}
             </section>
 
             <div className="space-y-2 lg:min-w-0">

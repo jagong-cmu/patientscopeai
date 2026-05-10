@@ -1,6 +1,11 @@
 # Local data (MIMIC demo, exports)
 /data/
 
+# Never commit bulk MIMIC / PhysioNet mirrors or DB dumps (GitHub size limits)
+/physionet.org/
+mimiciv.dump
+bq-results*.csv
+
 # Python
 .venv/
 venv/

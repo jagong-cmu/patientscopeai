@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const patientRosterLinkClass =
@@ -127,11 +126,6 @@ export function PatientRosterCard({
                       <Link className={patientRosterLinkClass} to={`/patients/${row.stay_id}`}>
                         {row.display_patient_id}
                       </Link>
-                      {row.is_demo ? (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Demo
-                        </Badge>
-                      ) : null}
                     </TableCell>
                     <TableCell className="text-right font-tabular">
                       {row.age_years != null ? row.age_years.toFixed(0) : "—"}

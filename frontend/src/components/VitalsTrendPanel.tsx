@@ -56,11 +56,7 @@ export function VitalsTrendPanel({
   }
 
   return (
-    <div className="space-y-8">
-      <p className="text-xs leading-snug text-muted-foreground">
-        Shaded bands show approximate reference intervals adjusted for age cohort when applicable. FiO₂ and oxygen flow
-        depend on therapy context; temperature assumes °F values above 45 are converted to °C for comparison.
-      </p>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4 lg:gap-5">
       {data.series.map((s) => {
         const band = getVitalReferenceBand(s.itemid, demographics);
         const chartData = s.points.map((p, i) => ({
@@ -80,7 +76,7 @@ export function VitalsTrendPanel({
           s.itemid === 223761 ? "°C" : s.itemid === 223834 ? "FiO₂" : s.itemid === 227287 || s.itemid === 223848 ? "L/min" : "";
 
         return (
-          <div key={s.itemid}>
+          <div key={s.itemid} className="min-w-0 rounded-lg border border-border/80 bg-card/30 p-3">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">{s.label}</p>
               {band && (
@@ -108,7 +104,7 @@ export function VitalsTrendPanel({
                 </Badge>
               )}
             </div>
-            <div className="h-36 w-full">
+            <div className="h-32 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 6, right: 12, left: 4, bottom: 0 }}>
                   <defs>

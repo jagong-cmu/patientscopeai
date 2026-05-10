@@ -7,16 +7,52 @@ import json
 import joblib
 import numpy as np
 from pathlib import Path
-from backend.schemas import RiskResponse, RiskDefinition, AuditResponse, SubgroupPerformance
+from backend.schemas import RiskDriverFeature, RiskResponse, RiskDefinition, AuditResponse, SubgroupPerformance
 from backend.services.mimic import get_patient_summary
 
 MODEL_DIR = Path(__file__).parent.parent.parent / "models" / "saved"
+
+# Human labels for model explanation (RandomForest feature_importances_)
+FEATURE_LABELS: dict[str, str] = {
+    "age_years": "Age",
+    "is_male": "Sex (male indicator)",
+    "icu_los_hours": "ICU length of stay",
+    "hr_mean": "Heart rate (24h mean)",
+    "hr_min": "Heart rate (24h minimum)",
+    "hr_max": "Heart rate (24h maximum)",
+    "map_mean": "Mean arterial pressure (24h mean)",
+    "map_min": "Mean arterial pressure (minimum)",
+    "map_max": "Mean arterial pressure (maximum)",
+    "rr_mean": "Respiratory rate (24h mean)",
+    "rr_min": "Respiratory rate (minimum)",
+    "rr_max": "Respiratory rate (maximum)",
+    "spo2_mean": "SpO₂ (24h mean)",
+    "spo2_min": "SpO₂ (minimum)",
+    "spo2_max": "SpO₂ (maximum)",
+    "temp_mean": "Temperature (24h mean)",
+    "temp_min": "Temperature (minimum)",
+    "temp_max": "Temperature (maximum)",
+    "hr_last": "Heart rate (last)",
+    "map_last": "Mean arterial pressure (last)",
+    "rr_last": "Respiratory rate (last)",
+    "spo2_last": "SpO₂ (last)",
+    "temp_last": "Temperature (last)",
+    "vasopressor_present_24h": "Vasopressor exposure (24h)",
+    "creat_last": "Creatinine (last)",
+    "creat_slope": "Creatinine trend (per lab draw)",
+    "bun_last": "BUN (last)",
+    "bun_slope": "BUN trend (per lab draw)",
+    "lactate_last": "Lactate (last)",
+    "wbc_last": "White blood cell count",
+    "hgb_last": "Hemoglobin",
+    "glucose_last": "Glucose (last)",
+}
 
 DEFINITIONS = [
     {
         "key":          "72h_unplanned_icu",
         "definition":   "72-hour unplanned ICU readmission after hospital discharge (proxy)",
-        "methodology":  "HistGradientBoosting trained on MIMIC-IV; features from last-24h vitals + last-48h labs before ICU outtime; label uses non-ELECTIVE readmission within 72h with ICU stay.",
+        "methodology":  "Random Forest (sklearn Pipeline: mean imputation → RF, class_weight balanced_subsample; optional SMOTE refit when TRAIN_USE_SMOTE=1 at train time). Features from last-24h vitals + last-48h labs before ICU outtime; label excludes elective readmissions within 72h with ICU stay.",
         "n_train":      0,
     },
 ]
@@ -48,6 +84,130 @@ def _load_train_report(key: str) -> dict | None:
         return json.loads(path.read_text())
     except Exception:
         return None
+
+
+def _load_explain_artifact(key: str) -> dict | None:
+    path = MODEL_DIR / f"{key}.explain.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _build_risk_explanation(
+    features: np.ndarray,
+    feature_columns: list[str],
+    explain: dict | None,
+    *,
+    model_loaded: bool,
+    features_available: bool,
+) -> tuple[str | None, list[RiskDriverFeature]]:
+    """
+    Short cohort-relative summary using global feature importances (not SHAP).
+    Does not claim causal mechanisms.
+    """
+    if not model_loaded or not features_available or explain is None:
+        return None, []
+
+    names = explain.get("feature_names") or []
+    imps = np.array(explain.get("importances") or [], dtype=float)
+    medians = explain.get("medians") or {}
+    p25 = explain.get("p25") or {}
+    p75 = explain.get("p75") or {}
+
+    if len(names) != len(imps) or len(imps) == 0:
+        return None, []
+
+    top_k = min(5, len(imps))
+    top_idx = np.argsort(imps)[-top_k:][::-1]
+
+    drivers: list[RiskDriverFeature] = []
+    col_index = {c: i for i, c in enumerate(feature_columns)}
+    imp_sum = float(imps.sum()) or 1.0
+
+    for fi in top_idx:
+        fname = names[fi]
+        frac = float(imps[fi]) / imp_sum
+        if fname not in col_index:
+            continue
+        v = features[0, col_index[fname]]
+        label = FEATURE_LABELS.get(fname, fname.replace("_", " "))
+        m = medians.get(fname)
+        lo = p25.get(fname)
+        hi = p75.get(fname)
+
+        if np.isnan(v):
+            drivers.append(
+                RiskDriverFeature(
+                    feature_key=fname,
+                    label=label,
+                    direction="typical",
+                    detail=(
+                        f"{label} was missing in the feature row; the model may treat missing values implicitly "
+                        f"(global importance share ~{int(round(frac * 100))}%)."
+                    ),
+                )
+            )
+            continue
+
+        if m is None or np.isnan(m):
+            direction = "typical"
+            detail = (
+                f"{label} = {v:.3g} (no cohort median available). "
+                f"Global importance share ~{int(round(frac * 100))}%."
+            )
+        elif lo is not None and hi is not None and not (np.isnan(lo) or np.isnan(hi)):
+            if v > hi:
+                direction = "higher"
+                detail = (
+                    f"{label} is above the training cohort's typical band (~75th percentile). "
+                    f"Importance share ~{int(round(frac * 100))}%."
+                )
+            elif v < lo:
+                direction = "lower"
+                detail = (
+                    f"{label} is below the training cohort's typical band (~25th percentile). "
+                    f"Importance share ~{int(round(frac * 100))}%."
+                )
+            else:
+                direction = "typical"
+                detail = (
+                    f"{label} falls near the middle of the training cohort distribution. "
+                    f"Importance share ~{int(round(frac * 100))}%."
+                )
+        elif not np.isnan(m):
+            direction = "higher" if v > m else "lower" if v < m else "typical"
+            detail = (
+                f"{label} is {'above' if v > m else 'below' if v < m else 'near'} the cohort median. "
+                f"Importance share ~{int(round(frac * 100))}%."
+            )
+        else:
+            direction = "typical"
+            detail = f"{label} = {v:.3g}. Importance share ~{int(round(frac * 100))}%."
+
+        drivers.append(
+            RiskDriverFeature(
+                feature_key=fname,
+                label=label,
+                direction=direction,
+                detail=detail,
+            )
+        )
+
+    header = (
+        "This score comes from a Random Forest trained on ICU stays with features taken from "
+        "the last 24h of vitals and 48h of labs before ICU exit. The items below are the inputs the model "
+        "weighted most strongly on average in training (mean decrease in impurity); they describe association "
+        "with the predicted probability, not proven causes."
+    )
+    body_parts = []
+    for d in drivers[:3]:
+        body_parts.append(f"{d.label}: {d.detail}")
+    explanation = header + (" " + " ".join(body_parts) if body_parts else "")
+
+    return explanation, drivers
 
 
 def _fetch_features_from_db(stay_id: int, feature_columns: list[str]) -> np.ndarray | None:
@@ -92,14 +252,24 @@ def predict_risk(stay_id: int) -> RiskResponse | None:
     for defn in DEFINITIONS:
         model = _load_model(defn["key"])
         report = _load_train_report(defn["key"]) or {}
+        explain = _load_explain_artifact(defn["key"])
         n_train = int(report.get("n_rows") or defn["n_train"] or 0)
-        if model is not None and features is not None:
+        model_ok = model is not None and features is not None
+        if model_ok:
             prob = float(model.predict_proba(features)[0][1])
             methodology_extra = ""
         else:
             # No derived feature row (e.g. mimicscope.features_v1 missing) or no trained model
             prob = 0.15
             methodology_extra = " (placeholder — deploy features_v1 + trained model for live scores)"
+
+        expl_text, drivers = _build_risk_explanation(
+            features if features is not None else np.array([[]]),
+            cols if cols else [],
+            explain,
+            model_loaded=model is not None,
+            features_available=features is not None,
+        )
 
         risks.append(RiskDefinition(
             definition=defn["definition"],
@@ -110,6 +280,8 @@ def predict_risk(stay_id: int) -> RiskResponse | None:
             ),
             methodology=defn["methodology"] + methodology_extra,
             n_train=n_train,
+            explanation=expl_text,
+            driver_features=drivers,
         ))
 
     return RiskResponse(stay_id=stay_id, risks=risks)

@@ -302,8 +302,8 @@ export default function WardOverviewPage() {
               <CardHeader>
                 <CardTitle className="text-lg">Discharge queue</CardTitle>
                 <CardDescription>
-                  {data.discharge_ready_count} patient{data.discharge_ready_count === 1 ? "" : "s"} ready for discharge
-                  review · {data.pending_admissions_count} pending admission
+                  Prioritized by 72h readmission risk, then NEWS · {data.discharge_ready_count} patient
+                  {data.discharge_ready_count === 1 ? "" : "s"} · {data.pending_admissions_count} pending admission
                   {data.pending_admissions_count === 1 ? "" : "s"}
                 </CardDescription>
               </CardHeader>
@@ -316,8 +316,8 @@ export default function WardOverviewPage() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Patient</TableHead>
+                        <TableHead className="text-right">72h risk</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
-                        <TableHead className="text-right">ICU LOS (h)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -329,14 +329,16 @@ export default function WardOverviewPage() {
                               {row.display_patient_id}
                             </Link>
                           </TableCell>
+                          <TableCell className="text-right font-tabular">
+                            {row.readmission_risk_72h != null
+                              ? `${(row.readmission_risk_72h * 100).toFixed(1)}%`
+                              : "—"}
+                          </TableCell>
                           <TableCell className="text-right">
                             <span className="inline-flex items-center justify-end gap-2">
                               <span className="font-tabular">{row.news_total}</span>
                               <NewsBandBadge band={row.news_band} compact />
                             </span>
-                          </TableCell>
-                          <TableCell className="text-right font-tabular">
-                            {row.icu_los_hours != null ? row.icu_los_hours.toFixed(1) : "—"}
                           </TableCell>
                         </TableRow>
                       ))}

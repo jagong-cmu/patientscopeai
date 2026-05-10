@@ -1,14 +1,14 @@
 """Claude API client for clinical narrative generation."""
 import os
 import anthropic
-from backend.schemas import NarrativeResponse, ReadinessResponse, RiskResponse, SimilarCase
+from backend.schemas import NarrativeResponse, NewsScoreResponse, RiskResponse, SimilarCase
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = "claude-sonnet-4-6"
 
 SYSTEM_PROMPT = """You are a clinical decision support assistant helping ICU clinicians at the moment of discharge.
 
-Your role is to synthesize a patient's readiness assessment into a clear, evidence-grounded clinical narrative.
+Your role is to synthesize a patient's NEWS assessment and risk context into a clear, evidence-grounded clinical narrative.
 
 Rules you must follow:
 - Every clinical claim must reference a specific data value from the patient's record
@@ -23,14 +23,13 @@ Rules you must follow:
 
 def generate_narrative(
     stay_id: int,
-    readiness: ReadinessResponse,
+    news: NewsScoreResponse,
     risk: RiskResponse,
     similar_cases: list[SimilarCase],
 ) -> NarrativeResponse:
-    # Build structured context for Claude
-    readiness_summary = "\n".join(
-        f"  - {c.label} [{c.status.upper()}] ({c.score:.2f}): {'; '.join(c.evidence)}"
-        for c in readiness.components
+    news_summary = "\n".join(
+        f"  - {p.label}: {p.value_display} ({p.points} pts)"
+        for p in news.parameters
     )
 
     risk_summary = "\n".join(
@@ -47,8 +46,10 @@ def generate_narrative(
 
     user_message = f"""Generate a clinical narrative for ICU stay {stay_id}.
 
-READINESS SCORE: {readiness.composite_status.upper()} ({readiness.composite_score:.2f})
-{readiness_summary}
+NEWS AGGREGATE: {news.total_score} (clinical band: {news.clinical_risk_band.upper()})
+{news_summary}
+
+LIMITATIONS: {'; '.join(news.limitations[:5])}
 
 MULTI-DEFINITION READMISSION RISK:
 {risk_summary}
@@ -57,13 +58,13 @@ SIMILAR HISTORICAL CASES:
 {similar_summary}
 
 Write a 150-200 word clinical narrative that:
-1. Opens with the overall discharge readiness assessment
-2. Highlights the 1-2 most clinically significant findings driving the assessment
+1. Opens with the NEWS aggregate and clinical risk band
+2. Highlights the 1-2 most clinically significant physiological parameters
 3. Interprets the readmission risk pattern in light of the most similar historical cases
-4. Closes with 2-3 specific considerations for the discharge team (framed as "consider")
+4. Closes with 2-3 specific considerations for the care team (framed as "consider")
 5. Ends with the mandatory disclaimer
 
-Cite specific data values from the readiness summary above — do not make up numbers."""
+Cite specific data values from the NEWS summary above — do not make up numbers."""
 
     response = _client.messages.create(
         model=MODEL,
@@ -74,11 +75,10 @@ Cite specific data values from the readiness summary above — do not make up nu
 
     narrative_text = response.content[0].text
 
-    # Derive suggestions from yellow/red components
     suggestions = [
-        f"Consider {_suggestion_for(c)}"
-        for c in readiness.components
-        if c.status in ("yellow", "red")
+        f"Consider clinical review of {p.label} ({p.points} NEWS point(s))"
+        for p in news.parameters
+        if p.points >= 2
     ]
 
     return NarrativeResponse(
@@ -89,11 +89,3 @@ Cite specific data values from the readiness summary above — do not make up nu
     )
 
 
-def _suggestion_for(component) -> str:
-    mapping = {
-        "Physiological Stability": "monitoring vital signs closely for 24h post-transfer",
-        "Laboratory Trajectory":   "repeat labs within 12h of transfer, particularly renal function",
-        "Medication Readiness":    "pharmacist review of discharge medication regimen before transfer",
-        "Care Continuity":         "scheduling follow-up within 7 days and confirming patient has a contact for concerns",
-    }
-    return mapping.get(component.label, f"additional review of {component.label.lower()}")

@@ -1,20 +1,14 @@
 """MongoDB Atlas — similar case retrieval via vector search."""
-import os
 import numpy as np
-from pymongo import MongoClient
 from backend.schemas import SimilarCase
-
-_client = None
+from backend.services.mongo_connection import get_mongo_client
 
 
 def _get_collection():
-    global _client
-    if _client is None:
-        uri = os.getenv("MONGODB_URI", "")
-        if not uri:
-            return None
-        _client = MongoClient(uri)
-    return _client["patientscope"]["icu_stays"]
+    client = get_mongo_client()
+    if client is None:
+        return None
+    return client["patientscope"]["icu_stays"]
 
 
 def upsert_stay_vector(stay_id: int, feature_vector: list[float], metadata: dict):

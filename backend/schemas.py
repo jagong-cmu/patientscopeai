@@ -1,19 +1,34 @@
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
 
-
-class ComponentScore(BaseModel):
-    label: str                  # e.g. "Physiological Stability"
-    score: float                # 0.0 – 1.0
-    status: str                 # "green" | "yellow" | "red"
-    evidence: list[str]         # human-readable data points driving this score
+WardAlertPatientTag = Literal["icu", "post_monitoring"]
 
 
-class ReadinessResponse(BaseModel):
+class NewsParameterScore(BaseModel):
+    """Single NEWS2 parameter row (RCP NEWS2 aggregate chart)."""
+    name: str                   # machine key e.g. respiratory_rate
+    label: str                  # display label
+    points: int                 # 0–3 per parameter
+    value_display: str          # human-readable value or em dash
+    subscale_note: Optional[str] = None
+
+
+class NewsScoreResponse(BaseModel):
     stay_id: int
-    composite_score: float
-    composite_status: str       # "green" | "yellow" | "red"
-    components: list[ComponentScore]
+    total_score: int            # 0–20 aggregate
+    clinical_risk_band: Literal["low", "medium", "high"]
+    parameters: list[NewsParameterScore]
+    evidence: list[str]
+    limitations: list[str]
+    scale_note: str
+
+
+class RiskDriverFeature(BaseModel):
+    """One top-weighted input vs training cohort (descriptive, not causal)."""
+    feature_key: str
+    label: str
+    direction: str              # "higher" | "lower" | "typical"
+    detail: str                 # short comparison vs cohort median
 
 
 class RiskDefinition(BaseModel):
@@ -22,6 +37,22 @@ class RiskDefinition(BaseModel):
     confidence_interval: tuple[float, float]
     methodology: str            # brief description of training cohort + model
     n_train: int
+    explanation: Optional[str] = None
+    driver_features: list[RiskDriverFeature] = Field(default_factory=list)
+
+
+class DischargeTimingScenario(BaseModel):
+    horizon_hours: float
+    probability: float
+    delta_vs_now: Optional[float] = None  # None when horizon is 0
+
+
+class DischargeTimingResponse(BaseModel):
+    stay_id: int
+    scenarios: list[DischargeTimingScenario]
+    disclaimer: str
+    methodology_note: str
+    is_placeholder: bool = False
 
 
 class RiskResponse(BaseModel):
@@ -42,7 +73,7 @@ class GroundingEvidence(BaseModel):
     id: str
     feature: str
     finding: str
-    anchor: Optional[Literal["readiness_component", "risk", "audit", "trajectory"]] = None
+    anchor: Optional[Literal["news_parameter", "risk", "audit", "trajectory"]] = None
 
 
 class NarrativeResponse(BaseModel):
@@ -72,6 +103,92 @@ class AuditResponse(BaseModel):
     trust_advisory: str         # e.g. "Model tends to underpredict risk in this subgroup"
 
 
+class WardPreviewRow(BaseModel):
+    stay_id: int
+    display_patient_id: str
+    news_total: int
+    news_band: Literal["low", "medium", "high"]
+    icu_los_hours: Optional[float] = None
+    readmission_risk_72h: Optional[float] = None
+
+
+class WardSummaryResponse(BaseModel):
+    census_count: int
+    bed_capacity: int
+    occupancy_ratio: float
+    pending_admissions_count: int
+    discharge_ready_count: int
+    discharge_queue_preview: list[WardPreviewRow]
+    high_risk_preview: list[WardPreviewRow]
+
+
+class WardAlertItem(BaseModel):
+    id: str
+    category: Literal["lab_trajectory", "news_context"]
+    message: str
+    occurred_at: str
+    stay_id: Optional[int] = None
+    tags: list[WardAlertPatientTag] = Field(default_factory=list)
+
+
+class WardAlertsResponse(BaseModel):
+    alerts: list[WardAlertItem]
+
+
+class VitalSeriesPoint(BaseModel):
+    charttime_iso: Optional[str] = None
+    valuenum: float
+
+
+class VitalTimeSeries(BaseModel):
+    itemid: int
+    label: str
+    points: list[VitalSeriesPoint]
+
+
+class VitalsSeriesResponse(BaseModel):
+    stay_id: int
+    series: list[VitalTimeSeries]
+
+
+class WatchlistCreate(BaseModel):
+    subject_id: int
+    index_stay_id: int
+
+
+class WatchlistRow(BaseModel):
+    subject_id: int
+    index_stay_id: int
+    display_patient_id: str
+    added_at: str
+    news_total: int
+    news_band: Literal["low", "medium", "high"]
+    data_freshness_note: str
+
+
+class WatchlistListResponse(BaseModel):
+    entries: list[WatchlistRow]
+
+
+DischargeDestinationCode = Literal["general_ward", "ltach", "nursing_facility", "home", "other"]
+
+
+class DischargeEventCreate(BaseModel):
+    """Clinician-recorded discharge destination (demo persistence)."""
+    stay_id: int
+    subject_id: int
+    destination: DischargeDestinationCode
+    notes: Optional[str] = None
+
+
+class DischargeEventResponse(BaseModel):
+    stay_id: int
+    subject_id: int
+    destination: str
+    notes: str
+    recorded_at: str
+
+
 class StayListRow(BaseModel):
     stay_id: int
     display_patient_id: str     # anonymized label e.g. Patient 10001
@@ -79,7 +196,8 @@ class StayListRow(BaseModel):
     gender: Optional[str]
     primary_diagnosis: Optional[str]
     icu_los_hours: Optional[float]
-    readiness_status: str       # green | yellow | red (demo row computed; others stub)
+    news_total: int             # aggregate NEWS 0–20
+    news_band: Literal["low", "medium", "high"]
     is_demo: bool
 
 
@@ -87,34 +205,14 @@ class StayListResponse(BaseModel):
     stays: list[StayListRow]
 
 
-class TrajectoryPoint(BaseModel):
-    t_hours: float              # hours since ICU admission (intime)
-    y: float
-
-
-class TrajectoryForecast(BaseModel):
-    """Illustrative forward projection — not a validated clinical forecast."""
-    t_hours: list[float]
-    mean: list[float]
-    lower: list[float]
-    upper: list[float]
-
-
-class TrajectorySeries(BaseModel):
-    series_id: str
+class VitalsRow(BaseModel):
+    """Latest charted value per vital sign item within the ICU stay window."""
+    itemid: int
     label: str
-    unit: str
-    points: list[TrajectoryPoint]
-    normal_low: Optional[float] = None
-    normal_high: Optional[float] = None
-    trend_label: str            # e.g. "Stabilizing", "Continuing to rise"
-    forecast: Optional[TrajectoryForecast] = None
-    discharge_t_hours: Optional[float] = None  # hours from intime to ICU out
+    value: float
+    charttime_iso: Optional[str] = None
 
 
-class TrajectoryResponse(BaseModel):
+class CurrentVitalsResponse(BaseModel):
     stay_id: int
-    intime_iso: Optional[str] = None
-    outtime_iso: Optional[str] = None
-    disclaimer: str
-    series: list[TrajectorySeries]
+    vitals: list[VitalsRow]

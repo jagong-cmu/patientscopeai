@@ -1,22 +1,11 @@
 """MIMIC-IV PostgreSQL query layer (psycopg3)."""
 import os
-from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Trajectory item sets (must match scoring / clinical priorities)
-TRAJ_LAB_ITEMS = {
-    50912: "creatinine",
-    51006: "bun",
-    50813: "lactate",
-    51301: "wbc",
-    51222: "hemoglobin",
-}
-TRAJ_MAP_ITEMS = {220052, 220181}  # MAP mmHg
 
 _CONNSTR = (
     f"host={os.getenv('POSTGRES_HOST', 'localhost')} "
@@ -110,7 +99,10 @@ def get_vitals_last24h(stay_id: int) -> list[dict]:
           AND ce.itemid IN (
               220045, 220050, 220051, 220052,
               220179, 220180, 220181,
-              220210, 220277, 223761
+              220210, 220277, 223761,
+              223834,
+              227287, 223848,
+              225309
           )
         ORDER BY ce.charttime
     """
@@ -149,7 +141,7 @@ def get_labs_last48h(stay_id: int) -> list[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
-def list_icu_stays(limit: int = 15) -> list[dict]:
+def list_icu_stays(limit: int = 100) -> list[dict]:
     """
     ICU stays with los >= 1 for dashboard list (anonymized labels).
     Includes primary diagnosis where available.
@@ -185,55 +177,3 @@ def list_icu_stays(limit: int = 15) -> list[dict]:
     with _conn() as con, con.cursor() as cur:
         cur.execute(sql, (limit,))
         return [dict(r) for r in cur.fetchall()]
-
-
-def get_trajectory_raw_events(stay_id: int) -> dict[str, Any] | None:
-    """
-    ICU intime/outtime plus bucketed hourly labs/vitals for trajectory charts.
-    Labs: admission hospitalization window intersect ICU stay; vitals: chartevents on stay.
-    """
-    sql_meta = """
-        SELECT icu.stay_id, icu.intime, icu.outtime, icu.hadm_id
-        FROM mimiciv_icu.icustays icu
-        WHERE icu.stay_id = %s
-    """
-    lab_sql = """
-        SELECT le.charttime AS ts, le.itemid, le.valuenum AS val
-        FROM mimiciv_hosp.labevents le
-        JOIN mimiciv_icu.icustays icu ON icu.stay_id = %s AND le.hadm_id = icu.hadm_id
-        WHERE le.valuenum IS NOT NULL
-          AND le.charttime >= icu.intime
-          AND le.charttime <= icu.outtime
-          AND le.itemid = ANY(%s::integer[])
-        ORDER BY le.charttime
-    """
-    vital_sql = """
-        SELECT ce.charttime AS ts, ce.itemid, ce.valuenum AS val
-        FROM mimiciv_icu.chartevents ce
-        JOIN mimiciv_icu.icustays icu ON icu.stay_id = ce.stay_id
-        WHERE ce.stay_id = %s
-          AND ce.valuenum IS NOT NULL
-          AND ce.charttime >= icu.intime
-          AND ce.charttime <= icu.outtime
-          AND ce.itemid = ANY(%s::integer[])
-        ORDER BY ce.charttime
-    """
-    lab_items = list(TRAJ_LAB_ITEMS.keys())
-    map_items = list(TRAJ_MAP_ITEMS)
-    with _conn() as con, con.cursor() as cur:
-        cur.execute(sql_meta, (stay_id,))
-        meta = cur.fetchone()
-        if not meta:
-            return None
-        intime, outtime = meta["intime"], meta["outtime"]
-        cur.execute(lab_sql, (stay_id, lab_items))
-        labs = [dict(r) for r in cur.fetchall()]
-        cur.execute(vital_sql, (stay_id, map_items))
-        vitals = [dict(r) for r in cur.fetchall()]
-    return {
-        "stay_id": stay_id,
-        "intime": intime,
-        "outtime": outtime,
-        "labs": labs,
-        "vitals": vitals,
-    }

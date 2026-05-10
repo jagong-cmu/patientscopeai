@@ -49,10 +49,9 @@ export function HubLayout({
             {showProdApiMissingBanner && (
               <Alert variant="destructive">
                 <AlertCircle className="size-4" />
-                <AlertTitle>Backend URL not set</AlertTitle>
+                <AlertTitle>Can&apos;t reach the server</AlertTitle>
                 <AlertDescription>
-                  Add <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">VITE_API_BASE</code> in your
-                  deployment environment.
+                  Check that this app is pointed at a running API in your deployment settings.
                 </AlertDescription>
               </Alert>
             )}

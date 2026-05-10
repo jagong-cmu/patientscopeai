@@ -3,12 +3,12 @@ import os
 from fastapi import APIRouter
 
 from backend.schemas import StayListResponse, StayListRow
+from backend.services.discharge_events_store import get_discharged_stay_ids
+from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
 from backend.services.mimic import list_icu_stays
-from backend.services.scoring import compute_readiness_score
+from backend.services.news import compute_news_score, news_stub_from_subject
 
 router = APIRouter()
-
-STAY_LIST_LIMIT = 15
 _DEFAULT_DEMO_STAY_ID = "31269608"
 
 
@@ -27,18 +27,20 @@ def _anon_label(subject_id: int) -> str:
 
 @router.get("", response_model=StayListResponse)
 def list_stays():
-    """ICU stays (los >= 1) for dashboard; demo row gets computed readiness, others stub."""
+    """ICU stays (los >= 1) for dashboard; NEWS computed per stay when chart data exists."""
     demo_id = _demo_stay_id()
-    rows = list_icu_stays(STAY_LIST_LIMIT)
+    discharged = get_discharged_stay_ids()
+    rows = [r for r in list_icu_stays(ICU_STAY_SCAN_LIMIT) if r["stay_id"] not in discharged]
     out: list[StayListRow] = []
     for r in rows:
         sid = r["stay_id"]
         is_demo = sid == demo_id
-        if is_demo:
-            rr = compute_readiness_score(sid)
-            rs = rr.composite_status if rr else "yellow"
+        ns = compute_news_score(sid)
+        if ns:
+            nt = ns.total_score
+            nb = ns.clinical_risk_band
         else:
-            rs = ["green", "yellow", "red"][r["subject_id"] % 3]
+            nt, nb = news_stub_from_subject(r["subject_id"])
         age = r.get("age_years")
         los = r.get("icu_los_hours")
         out.append(
@@ -49,7 +51,8 @@ def list_stays():
                 gender=r.get("gender"),
                 primary_diagnosis=r.get("primary_diagnosis"),
                 icu_los_hours=float(los) if los is not None else None,
-                readiness_status=rs,
+                news_total=nt,
+                news_band=nb,
                 is_demo=is_demo,
             )
         )

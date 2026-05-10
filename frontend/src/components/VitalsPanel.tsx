@@ -7,14 +7,7 @@ import {
 } from "../lib/vitalReferenceRanges";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 function formatChartTime(iso: string | null): string {
   if (!iso) return "—";
@@ -40,6 +33,28 @@ function displayValue(itemid: number, value: number): string {
   return String(value);
 }
 
+function statusBadge(status: ReturnType<typeof classifyVitalValue>) {
+  if (status === "normal") {
+    return (
+      <Badge variant="outline" className="shrink-0 border-emerald-600/50 text-[10px] text-emerald-800 dark:text-emerald-400">
+        Normal
+      </Badge>
+    );
+  }
+  if (status === "abnormal") {
+    return (
+      <Badge variant="outline" className="shrink-0 border-destructive/60 text-[10px] text-critical">
+        Abnormal
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
+      —
+    </Badge>
+  );
+}
+
 export function VitalsPanel({
   data,
   demographics,
@@ -63,53 +78,30 @@ export function VitalsPanel({
 
   return (
     <Card className="shadow-[var(--shadow-card)]">
-      <CardContent className="space-y-3 pt-4">
-        <p className="text-xs leading-snug text-muted-foreground">
-          Status compares each value to an approximate reference interval for this patient&apos;s age cohort (see Trends
-          charts for shaded bands). FiO₂ &gt; room air and any oxygen flow are flagged when therapy is present.
-        </p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Vital</TableHead>
-              <TableHead className="text-right">Value</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right">Chart time</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((v) => {
-              const status = classifyVitalValue(v.itemid, v.value, demographics);
-              return (
-                <TableRow key={v.itemid}>
-                  <TableCell className="font-medium">{v.label}</TableCell>
-                  <TableCell className="text-right font-tabular">{displayValue(v.itemid, v.value)}</TableCell>
-                  <TableCell className="text-center">
-                    {status === "normal" && (
-                      <Badge
-                        variant="outline"
-                        className="border-emerald-600/50 text-emerald-800 dark:text-emerald-400"
-                      >
-                        Normal
-                      </Badge>
-                    )}
-                    {status === "abnormal" && (
-                      <Badge variant="outline" className="border-destructive/60 text-critical">
-                        Abnormal
-                      </Badge>
-                    )}
-                    {status === "unknown" && (
-                      <Badge variant="secondary" className="text-xs font-normal">
-                        —
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">{formatChartTime(v.charttime_iso)}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+      <CardContent className="pt-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+          {rows.map((v) => {
+            const status = classifyVitalValue(v.itemid, v.value, demographics);
+            return (
+              <div
+                key={v.itemid}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-2.5",
+                  "text-sm",
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 font-medium leading-tight text-foreground">{v.label}</p>
+                  {statusBadge(status)}
+                </div>
+                <p className="font-tabular text-base font-semibold tracking-tight text-foreground">
+                  {displayValue(v.itemid, v.value)}
+                </p>
+                <p className="text-[11px] leading-none text-muted-foreground">{formatChartTime(v.charttime_iso)}</p>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );

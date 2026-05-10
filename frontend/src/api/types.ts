@@ -27,6 +27,7 @@ export interface WardPreviewRow {
   news_total: number;
   news_band: NewsClinicalBand;
   icu_los_hours?: number | null;
+  readmission_risk_72h?: number | null;
 }
 
 export interface WardSummaryResponse {

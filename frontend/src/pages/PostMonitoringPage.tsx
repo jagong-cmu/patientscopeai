@@ -36,26 +36,13 @@ export default function PostMonitoringPage() {
   });
 
   const rows: WatchlistRow[] = data?.entries ?? [];
-  const mongoUnavailable = error instanceof Error && error.message.includes("503");
+  const listUnavailable = error instanceof Error && error.message.includes("503");
 
   return (
-    <HubLayout
-      title="Post-Monitoring"
-      subtitle="Post–ICU monitoring — NEWS from last MIMIC chart window (demo limits)"
-    >
-      <Card className="border-dashed shadow-[var(--shadow-card)]">
-        <CardHeader>
-          <CardTitle className="text-base">How this works</CardTitle>
-          <CardDescription>
-            Entries are stored when MongoDB is configured on the API. NEWS reflects the most recent structured vitals still
-            in the database for that patient — not live telemetry after discharge.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
+    <HubLayout title="Post-monitoring" subtitle="Patients flagged for follow-up after ICU discharge">
       {isLoading && (
         <div className="space-y-3" aria-busy="true" aria-label="Loading post-monitoring list">
-          <p className="text-sm text-muted-foreground">Loading post-monitoring…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
           <div className="grid gap-2">
             <div className="h-24 animate-pulse rounded-lg bg-muted/60" />
             <div className="h-24 animate-pulse rounded-lg bg-muted/60" />
@@ -63,14 +50,11 @@ export default function PostMonitoringPage() {
         </div>
       )}
 
-      {mongoUnavailable && (
-        <p className="text-sm text-muted-foreground">
-          Post-monitoring API returned unavailable — set <code className="rounded bg-muted px-1">MONGODB_URI</code> on the
-          backend to persist rows.
-        </p>
+      {listUnavailable && (
+        <p className="text-sm text-muted-foreground">Post-monitoring list is unavailable right now.</p>
       )}
 
-      {error && !mongoUnavailable && (
+      {error && !listUnavailable && (
         <p className="text-sm text-critical">{error instanceof Error ? error.message : String(error)}</p>
       )}
 
@@ -79,18 +63,23 @@ export default function PostMonitoringPage() {
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
             <div>
               <CardTitle>Monitored patients</CardTitle>
-              <CardDescription>{rows.length} entr{rows.length === 1 ? "y" : "ies"} (global demo scope)</CardDescription>
+              <CardDescription>
+                {rows.length} patient{rows.length === 1 ? "" : "s"}
+              </CardDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="transition-transform active:scale-[0.98]"
+              onClick={() => void refetch()}
+            >
               Refresh NEWS
             </Button>
           </CardHeader>
           <CardContent className="p-0">
             {rows.length === 0 ? (
-              <p className="px-6 pb-6 text-sm text-muted-foreground">
-                No patients on post-monitoring. Use the roster or ward overview to manage monitored stays via the API (
-                <span className="font-tabular">/api/watchlist</span>).
-              </p>
+              <p className="px-6 pb-6 text-sm text-muted-foreground">No patients on this list.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -119,7 +108,7 @@ export default function PostMonitoringPage() {
                       <TableCell className="max-w-[220px] text-xs text-muted-foreground">
                         <span className="line-clamp-2">{row.data_freshness_note}</span>
                         <Badge variant="outline" className="mt-1 border-warning/40 text-[10px] text-muted-foreground">
-                          Last DB snapshot
+                          Last snapshot
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-tabular text-xs text-muted-foreground">
@@ -130,7 +119,7 @@ export default function PostMonitoringPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-critical hover:text-critical"
+                          className="text-critical transition-transform active:scale-[0.98] hover:text-critical"
                           disabled={removeMut.isPending}
                           onClick={() => removeMut.mutate(row.subject_id)}
                         >

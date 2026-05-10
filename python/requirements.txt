@@ -12,8 +12,10 @@ prettytable>=2.5,<3         # v3 breaks ipython-sql table display (KeyError: 'DE
 scikit-learn>=1.5.0
 numpy>=2.1.0
 pandas>=2.2.0
+pyarrow>=14.0.0             # Parquet export training (TRAINING_PARQUET / BigQuery extract)
 scipy>=1.14.0
 joblib>=1.4.0
+imbalanced-learn>=0.13.0    # SMOTE + pipelines (optional in train.py)
 
 # Visualization / bias audit
 matplotlib>=3.9.0

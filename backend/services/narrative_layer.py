@@ -19,10 +19,11 @@ from typing import Any
 import anthropic
 
 from backend.schemas import GroundingEvidence, NarrativeResponse, SimilarCase
-from backend.services.models import get_subgroup_audit, predict_risk
+from backend.services.models import predict_risk
 from backend.services.mongo import find_similar_cases
 from backend.services.mimic import get_patient_summary
-from backend.services.scoring import compute_readiness_score
+from backend.services.news import compute_news_score
+from backend.services.ward_context import get_ward_operational_context
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -134,10 +135,8 @@ def _grounding_anchor(evidence_row: dict) -> str | None:
     eid = evidence_row.get("id", "")
     if eid == "ev_risk_72h_unplanned_icu":
         return "risk"
-    if eid == "ev_bias_audit":
-        return "audit"
-    if isinstance(eid, str) and eid.startswith("ev_readiness"):
-        return "readiness_component"
+    if isinstance(eid, str) and eid.startswith("ev_news"):
+        return "news_parameter"
     return None
 
 
@@ -155,55 +154,51 @@ def _grounding_evidence_list(structured: dict) -> list[GroundingEvidence]:
     return out
 
 
-def _compute_concordance(readiness_status: str, risk_prob: float | None) -> dict:
-    # Deterministic concordance signal (v1). Keep simple and explainable.
+def _compute_concordance_news(news_band: str, risk_prob: float | None) -> dict:
     prob = risk_prob if risk_prob is not None else 0.0
-    if readiness_status == "green" and prob >= 0.25:
+    if news_band == "low" and prob >= 0.25:
         pattern = "discordant_risk"
-        rationale = "Readiness appears stable, but model-estimated 72h unplanned ICU readmission risk is elevated."
-    elif readiness_status in ("yellow", "red") and prob >= 0.25:
-        pattern = "high_confidence_concern"
-        rationale = "Readiness concerns align with elevated model-estimated near-term unplanned ICU readmission risk."
-    elif readiness_status in ("yellow", "red") and prob < 0.25:
-        pattern = "subclinical_concern"
-        rationale = "Readiness is not fully green, but near-term unplanned ICU readmission risk is not markedly elevated."
+        rationale = "NEWS aggregate is low, but model-estimated 72h unplanned ICU readmission risk is elevated."
+    elif news_band in ("medium", "high") and prob >= 0.25:
+        pattern = "aligned_concern"
+        rationale = "Elevated NEWS aligns with elevated model-estimated near-term unplanned ICU readmission risk."
+    elif news_band in ("medium", "high") and prob < 0.25:
+        pattern = "monitoring_focus"
+        rationale = "NEWS suggests physiological concern though near-term readmission risk estimate is not markedly elevated."
     else:
-        pattern = "low_concern"
-        rationale = "Readiness and near-term unplanned ICU readmission risk are both not strongly concerning."
+        pattern = "lower_concern"
+        rationale = "NEWS aggregate and readmission risk estimates are not strongly discordant."
     return {"pattern": pattern, "rationale": rationale, "risk_probability": prob}
 
 
 def build_structured_input(stay_id: int) -> dict:
     patient = get_patient_summary(stay_id)
-    readiness = compute_readiness_score(stay_id)
+    news = compute_news_score(stay_id)
     risk = predict_risk(stay_id)
-    audit = get_subgroup_audit(stay_id)
-    # Similar cases are optional; Mongo may be unavailable in hackathon/dev.
     try:
         similar = find_similar_cases(stay_id)
     except Exception:
         similar = []
 
-    if not patient or not readiness or not risk:
+    if not patient or not news or not risk:
         raise ValueError(f"stay_id {stay_id} not found")
 
-    # Evidence IDs: deterministic IDs for component evidence + risk + audit.
     evidence: list[dict] = []
 
-    for comp in readiness.components:
-        for idx, ev in enumerate(comp.evidence):
-            evid = {
-                "id": f"ev_readiness_{comp.label.lower().replace(' ', '_')}_{idx+1}",
-                "feature": comp.label,
-                "finding": ev,
-                "severity": comp.status,
-                "source_query": "readiness_engine",
-                "source_data": {
-                    "component_score": comp.score,
-                    "component_status": comp.status,
-                },
-            }
-            evidence.append(evid)
+    for p in news.parameters:
+        evid = {
+            "id": f"ev_news_{p.name}",
+            "feature": p.label,
+            "finding": f"{p.label}: {p.value_display} ({p.points} point(s))",
+            "severity": news.clinical_risk_band,
+            "source_query": "backend/services/news.py (NEWS2-aligned)",
+            "source_data": {
+                "points": p.points,
+                "value_display": p.value_display,
+                "subscale_note": p.subscale_note,
+            },
+        }
+        evidence.append(evid)
 
     risk_def = risk.risks[0] if risk.risks else None
     if risk_def:
@@ -222,24 +217,7 @@ def build_structured_input(stay_id: int) -> dict:
             }
         )
 
-    if audit:
-        evidence.append(
-            {
-                "id": "ev_bias_audit",
-                "feature": "bias_audit",
-                "finding": audit.trust_advisory,
-                "severity": "caution",
-                "source_query": "backend/services/models.get_subgroup_audit",
-                "source_data": {
-                    "subgroup": audit.patient_subgroup,
-                    "auc_subgroup": audit.subgroup_performance.auc,
-                    "auc_overall": audit.subgroup_performance.auc_overall,
-                    "calibration_note": audit.subgroup_performance.calibration_note,
-                },
-            }
-        )
-
-    concordance = _compute_concordance(readiness.composite_status, risk_def.probability if risk_def else None)
+    concordance = _compute_concordance_news(news.clinical_risk_band, risk_def.probability if risk_def else None)
 
     structured = {
         "icu_stay_id": str(stay_id),
@@ -253,19 +231,22 @@ def build_structured_input(stay_id: int) -> dict:
             "icu_los_hours": patient.get("icu_los_hours"),
             "first_careunit": patient.get("first_careunit"),
             "discharge_disposition": patient.get("discharge_location"),
+            "ward_operational": get_ward_operational_context(),
         },
-        "readiness": {
-            "composite": {"label": readiness.composite_status, "numeric": readiness.composite_score},
-            "components": [
+        "news": {
+            "total_score": news.total_score,
+            "clinical_risk_band": news.clinical_risk_band,
+            "limitations": news.limitations,
+            "scale_note": news.scale_note,
+            "parameters": [
                 {
-                    "label": c.label,
-                    "status": c.status,
-                    "numeric": c.score,
-                    "evidence_ids": [
-                        f"ev_readiness_{c.label.lower().replace(' ', '_')}_{i+1}" for i in range(len(c.evidence))
-                    ],
+                    "name": p.name,
+                    "label": p.label,
+                    "points": p.points,
+                    "value_display": p.value_display,
+                    "evidence_id": f"ev_news_{p.name}",
                 }
-                for c in readiness.components
+                for p in news.parameters
             ],
         },
         "risk_predictions": {
@@ -277,7 +258,6 @@ def build_structured_input(stay_id: int) -> dict:
             "evidence_id": "ev_risk_72h_unplanned_icu" if risk_def else None,
         },
         "similar_cases": [c.model_dump() if hasattr(c, "model_dump") else dict(c) for c in similar],
-        "bias_audit": audit.model_dump() if audit and hasattr(audit, "model_dump") else (audit.dict() if audit else None),
         "concordance_signal": concordance,
         "evidence": evidence,
     }
@@ -289,8 +269,8 @@ def run_synthesis_agent(structured_input: dict) -> dict:
 
     evidence_ids = [e["id"] for e in structured_input.get("evidence", [])]
     system = (
-        "You are a clinical reasoning assistant analyzing an ICU discharge readiness assessment. "
-        "You MUST output valid JSON only."
+        "You are a clinical reasoning assistant analyzing an ICU stay using NEWS (National Early Warning Score) "
+        "and readmission risk context. You MUST output valid JSON only."
     )
     user = {
         "task": "Produce a reasoning skeleton JSON.",
@@ -299,6 +279,7 @@ def run_synthesis_agent(structured_input: dict) -> dict:
             "Every claim must cite evidence IDs in square brackets like [ev_...].",
             f"Valid evidence IDs: {evidence_ids}",
             "Do NOT write prose paragraphs.",
+            "Weigh context.ward_operational when reasoning about disposition urgency: crowded ICU + pending admissions increases pressure to prioritize stable transfers.",
         ],
         "required_fields": [
             "headline_finding",
@@ -341,12 +322,17 @@ def run_narrative_agent(structured_input: dict, skeleton: dict, issues: list[str
     )
 
     prompt = {
-        "task": "Write a 3–5 paragraph ICU discharge narrative (200–300 words).",
+        "task": (
+            "Write a 3–5 paragraph ICU narrative (200–300 words) integrating NEWS, readmission risk, "
+            "and ICU bed availability / pending admissions from structured_input.context.ward_operational."
+        ),
         "constraints": [
             "Every clinical claim must cite an evidence ID in square brackets like [ev_...].",
             "Use only evidence IDs listed; do not fabricate.",
             "Use deferential language: 'consider', 'may benefit from'. Never directive 'must/should'.",
             "Do not predict outcomes (no 'will be readmitted').",
+            "Where ICU capacity is constrained (few available beds and/or significant pending admissions), "
+            "tie disposition reasoning explicitly to throughput pressure — still grounded in cited evidence.",
             f"Valid evidence IDs: {evidence_ids}",
         ],
         "structured_input": structured_input,
@@ -390,9 +376,10 @@ def generate_narrative_with_guardrails(stay_id: int, max_retries: int = 2) -> Na
 
     citations_used = sorted(set(_citation_ids_from_text(narrative)))
     suggestions = []
-    for comp in structured["readiness"]["components"]:
-        if comp["status"] in ("yellow", "red"):
-            suggestions.append(f"Consider reviewing {comp['label']} factors referenced in {', '.join(comp['evidence_ids'])}")
+    for p in structured["news"]["parameters"]:
+        if int(p.get("points", 0)) >= 2:
+            eid = p.get("evidence_id") or f"ev_news_{p.get('name', '')}"
+            suggestions.append(f"Consider clinical review of {p.get('label', 'parameter')} — see [{eid}]")
 
     result = NarrativeResponse(
         stay_id=stay_id,
