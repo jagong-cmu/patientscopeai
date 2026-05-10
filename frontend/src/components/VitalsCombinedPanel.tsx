@@ -1,15 +1,22 @@
 import type { CurrentVitalsResponse, VitalsSeriesResponse } from "../api/types";
+import type { VitalDemographics } from "../lib/vitalReferenceRanges";
 import { VitalsPanel } from "./VitalsPanel";
 import { VitalsTrendPanel } from "./VitalsTrendPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const defaultDemo: VitalDemographics = { ageYears: null, gender: null };
+
 export function VitalsCombinedPanel({
   current,
   series,
+  demographics = defaultDemo,
 }: {
   current: CurrentVitalsResponse | undefined;
   series: VitalsSeriesResponse | undefined;
+  demographics?: VitalDemographics;
 }) {
+  const demo = demographics;
+
   if (!current?.vitals.length && !series?.series.length) {
     return (
       <p className="text-sm text-muted-foreground">No vitals in the chart window for this stay.</p>
@@ -24,14 +31,14 @@ export function VitalsCombinedPanel({
       </TabsList>
       <TabsContent value="trends" className="mt-4">
         {series && series.series.length > 0 ? (
-          <VitalsTrendPanel data={series} />
+          <VitalsTrendPanel data={series} demographics={demo} />
         ) : (
           <p className="text-sm text-muted-foreground">No series data.</p>
         )}
       </TabsContent>
       <TabsContent value="latest" className="mt-4">
         {current && current.vitals.length > 0 ? (
-          <VitalsPanel data={current} />
+          <VitalsPanel data={current} demographics={demo} />
         ) : (
           <p className="text-sm text-muted-foreground">No latest vitals row.</p>
         )}

@@ -5,7 +5,6 @@ import type { WatchlistListResponse, WatchlistRow } from "../api/types";
 import { apiDelete, apiGet } from "../api/client";
 import { HubLayout } from "../components/hub/HubLayout";
 import { NewsBandBadge } from "../components/StatusBadge";
-import { ClipboardList } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -44,20 +43,6 @@ export default function PostMonitoringPage() {
       title="Post-Monitoring"
       subtitle="Post–ICU monitoring — NEWS from last MIMIC chart window (demo limits)"
     >
-      <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/patients">
-            <ClipboardList className="mr-1.5 size-4" />
-            ICU roster
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">
-            Ward overview
-          </Link>
-        </Button>
-      </div>
-
       <Card className="border-dashed shadow-[var(--shadow-card)]">
         <CardHeader>
           <CardTitle className="text-base">How this works</CardTitle>
@@ -68,7 +53,15 @@ export default function PostMonitoringPage() {
         </CardHeader>
       </Card>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {isLoading && (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading post-monitoring list">
+          <p className="text-sm text-muted-foreground">Loading post-monitoring…</p>
+          <div className="grid gap-2">
+            <div className="h-24 animate-pulse rounded-lg bg-muted/60" />
+            <div className="h-24 animate-pulse rounded-lg bg-muted/60" />
+          </div>
+        </div>
+      )}
 
       {mongoUnavailable && (
         <p className="text-sm text-muted-foreground">
@@ -104,7 +97,6 @@ export default function PostMonitoringPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Patient</TableHead>
                     <TableHead className="text-right">NEWS</TableHead>
-                    <TableHead>Band</TableHead>
                     <TableHead>Data freshness</TableHead>
                     <TableHead className="text-right">Added</TableHead>
                     <TableHead />
@@ -118,9 +110,11 @@ export default function PostMonitoringPage() {
                           {row.display_patient_id}
                         </Link>
                       </TableCell>
-                      <TableCell className="text-right font-tabular">{row.news_total}</TableCell>
-                      <TableCell>
-                        <NewsBandBadge band={row.news_band} compact />
+                      <TableCell className="text-right">
+                        <span className="inline-flex items-center justify-end gap-2">
+                          <span className="font-tabular">{row.news_total}</span>
+                          <NewsBandBadge band={row.news_band} compact />
+                        </span>
                       </TableCell>
                       <TableCell className="max-w-[220px] text-xs text-muted-foreground">
                         <span className="line-clamp-2">{row.data_freshness_note}</span>

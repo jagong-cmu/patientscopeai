@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 
 const DISCHARGE_DESTINATIONS = [
@@ -254,7 +255,20 @@ export default function PatientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {loadingCore && <p className="text-sm text-muted-foreground">Loading patient…</p>}
+      {loadingCore && (
+        <div className="space-y-8" aria-busy="true" aria-label="Loading patient record">
+          <p className="text-sm text-muted-foreground">Loading patient record…</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-72 w-full rounded-xl" />
+            <Skeleton className="h-72 w-full rounded-xl" />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-48 w-full rounded-xl" />
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-56 w-full rounded-xl" />
+        </div>
+      )}
       {errCore && (
         <p className="text-sm text-critical">
           {errCore.message}{" "}
@@ -265,126 +279,94 @@ export default function PatientDetailPage() {
       )}
 
       {!loadingCore && !errCore && patient && newsQ.data && (
-        <div className="space-y-8">
-          <Card className="overflow-hidden shadow-[var(--shadow-card)]">
-            <CardHeader className="border-b border-border bg-muted/20 pb-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-xl">{displayPatient}</CardTitle>
-                  <CardDescription className="mt-1">ICU stay {id}</CardDescription>
+        <div className="space-y-6 animate-in fade-in-0 duration-300">
+          {/*
+            Single 2×2 grid: summary↔risk & timing, narrative↔NEWS (paired row heights).
+          */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+            <Card className="overflow-hidden shadow-[var(--shadow-card)] lg:min-w-0">
+              <CardHeader className="border-b border-border bg-muted/20 pb-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-xl">{displayPatient}</CardTitle>
+                    <CardDescription className="mt-1">ICU stay {id}</CardDescription>
+                  </div>
+                  {!patient.discharged_from_icu ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setPostMonitorAfterDischarge(false);
+                        setDischargeOpen(true);
+                      }}
+                    >
+                      Discharge patient
+                    </Button>
+                  ) : (
+                    <p className="max-w-sm text-right text-xs text-muted-foreground">
+                      Discharge recorded — removed from ICU census
+                      {patient.post_monitoring ? " · post-monitoring" : ""}
+                    </p>
+                  )}
                 </div>
-                {!patient.discharged_from_icu ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      setPostMonitorAfterDischarge(false);
-                      setDischargeOpen(true);
-                    }}
-                  >
-                    Discharge patient
-                  </Button>
-                ) : (
-                  <p className="max-w-sm text-right text-xs text-muted-foreground">
-                    Discharge recorded — removed from ICU census
-                    {patient.post_monitoring ? " · post-monitoring" : ""}
+              </CardHeader>
+              <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
+                <div className="space-y-3 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demographics</p>
+                  <dl className="grid gap-2">
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Age</dt>
+                      <dd className="font-tabular font-medium">{patient.age_years?.toFixed(0) ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Sex</dt>
+                      <dd>{patient.gender ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Race / ethnicity</dt>
+                      <dd className="text-right">{patient.race ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Insurance</dt>
+                      <dd className="text-right">{patient.insurance ?? "—"}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stay</p>
+                  <dl className="grid gap-2">
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">ICU LOS</dt>
+                      <dd className="font-tabular font-medium">
+                        {patient.icu_los_hours != null ? `${patient.icu_los_hours.toFixed(1)} h` : "—"}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Hospital LOS</dt>
+                      <dd className="font-tabular font-medium">
+                        {patient.hospital_los_hours != null ? `${patient.hospital_los_hours.toFixed(1)} h` : "—"}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Unit</dt>
+                      <dd className="text-right">{patient.first_careunit ?? "—"}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Disposition</dt>
+                      <dd className="text-right">{patient.discharge_location ?? "—"}</dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="md:col-span-2 rounded-lg border border-border bg-secondary/20 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary diagnosis</p>
+                  <p className="mt-2 text-sm leading-relaxed text-foreground">
+                    {patient.primary_diagnosis ?? "Not available"}
                   </p>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
-              <div className="space-y-3 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demographics</p>
-                <dl className="grid gap-2">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Age</dt>
-                    <dd className="font-tabular font-medium">{patient.age_years?.toFixed(0) ?? "—"}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Sex</dt>
-                    <dd>{patient.gender ?? "—"}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Race / ethnicity</dt>
-                    <dd className="text-right">{patient.race ?? "—"}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Insurance</dt>
-                    <dd className="text-right">{patient.insurance ?? "—"}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="space-y-3 text-sm">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stay</p>
-                <dl className="grid gap-2">
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">ICU LOS</dt>
-                    <dd className="font-tabular font-medium">
-                      {patient.icu_los_hours != null ? `${patient.icu_los_hours.toFixed(1)} h` : "—"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Hospital LOS</dt>
-                    <dd className="font-tabular font-medium">
-                      {patient.hospital_los_hours != null ? `${patient.hospital_los_hours.toFixed(1)} h` : "—"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Unit</dt>
-                    <dd className="text-right">{patient.first_careunit ?? "—"}</dd>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Disposition</dt>
-                    <dd className="text-right">{patient.discharge_location ?? "—"}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="md:col-span-2 rounded-lg border border-border bg-secondary/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Primary diagnosis</p>
-                <p className="mt-2 text-sm leading-relaxed text-foreground">
-                  {patient.primary_diagnosis ?? "Not available"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-foreground">Clinical narrative</h2>
-              <Button
-                type="button"
-                size="sm"
-                variant={narrativeVisible ? "outline" : "default"}
-                disabled={narrativeBusy}
-                onClick={() => narrativeMut.mutate()}
-              >
-                {narrativeBusy ? "Generating…" : narrativeVisible ? "Regenerate" : "Generate narrative"}
-              </Button>
-            </div>
-            {narrativeMut.isError && (
-              <p className="text-sm text-critical">{(narrativeMut.error as Error).message}</p>
-            )}
-            {(narrativeMut.isPending || narrativeRevealPending) && <NarrativeLoading />}
-            {narrativeVisible && !narrativeBusy && <NarrativeBlock data={narrativeVisible} />}
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NEWS</h2>
-            <NewsScorePanel data={newsQ.data} />
-          </section>
-
-          <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
-            <section className="space-y-3 xl:col-span-7">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vitals</h2>
-              {vitalsQ.data || vitalsSeriesQ.data ? (
-                <VitalsCombinedPanel current={vitalsQ.data} series={vitalsSeriesQ.data} />
-              ) : null}
-              {vitalsQ.isLoading && <p className="text-sm text-muted-foreground">Loading vitals…</p>}
-              {(vitalsQ.error || vitalsSeriesQ.error) && (
-                <p className="text-sm text-critical">Vitals unavailable for this stay.</p>
-              )}
-            </section>
-            <aside className="space-y-4 xl:col-span-5">
+            <aside className="space-y-4 lg:min-w-0">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Risk &amp; timing
               </h2>
@@ -407,7 +389,55 @@ export default function PatientDetailPage() {
                 </Card>
               )}
             </aside>
+
+            <section className="space-y-3 lg:min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-foreground">Clinical narrative</h2>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={narrativeVisible ? "outline" : "default"}
+                  disabled={narrativeBusy}
+                  onClick={() => narrativeMut.mutate()}
+                >
+                  {narrativeBusy ? "Generating…" : narrativeVisible ? "Regenerate" : "Generate narrative"}
+                </Button>
+              </div>
+              {narrativeMut.isError && (
+                <p className="text-sm text-critical">{(narrativeMut.error as Error).message}</p>
+              )}
+              {(narrativeMut.isPending || narrativeRevealPending) && <NarrativeLoading />}
+              {narrativeVisible && !narrativeBusy && <NarrativeBlock data={narrativeVisible} />}
+            </section>
+
+            <div className="space-y-2 lg:min-w-0">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NEWS</h2>
+              <NewsScorePanel data={newsQ.data} compact />
+            </div>
           </div>
+
+          <section className="space-y-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vitals</h2>
+            {vitalsQ.data || vitalsSeriesQ.data ? (
+              <VitalsCombinedPanel
+                current={vitalsQ.data}
+                series={vitalsSeriesQ.data}
+                demographics={{
+                  ageYears: patient.age_years,
+                  gender: patient.gender,
+                }}
+              />
+            ) : null}
+            {vitalsQ.isLoading && !(vitalsQ.data || vitalsSeriesQ.data) && (
+              <>
+                <p className="text-sm text-muted-foreground">Loading vitals…</p>
+                <Skeleton className="h-44 w-full rounded-xl" />
+              </>
+            )}
+            {(vitalsQ.error || vitalsSeriesQ.error) && (
+              <p className="text-sm text-critical">Vitals unavailable for this stay.</p>
+            )}
+          </section>
         </div>
       )}
     </HubLayout>

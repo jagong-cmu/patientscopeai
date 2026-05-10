@@ -1,5 +1,12 @@
 import type { CurrentVitalsResponse } from "../api/types";
+import type { VitalDemographics } from "../lib/vitalReferenceRanges";
+import {
+  classifyVitalValue,
+  normalizeFiO2Fraction,
+  normalizeTemperatureToCelsius,
+} from "../lib/vitalReferenceRanges";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -21,7 +28,25 @@ function formatChartTime(iso: string | null): string {
   });
 }
 
-export function VitalsPanel({ data }: { data: CurrentVitalsResponse }) {
+function displayValue(itemid: number, value: number): string {
+  if (itemid === 223834) {
+    const f = normalizeFiO2Fraction(value);
+    return `${(f * 100).toFixed(0)}%`;
+  }
+  if (itemid === 223761 && value > 45) {
+    const c = normalizeTemperatureToCelsius(value);
+    return `${c.toFixed(1)} °C (${value.toFixed(1)} °F)`;
+  }
+  return String(value);
+}
+
+export function VitalsPanel({
+  data,
+  demographics,
+}: {
+  data: CurrentVitalsResponse;
+  demographics: VitalDemographics;
+}) {
   const rows = data.vitals;
 
   if (rows.length === 0) {
@@ -38,25 +63,51 @@ export function VitalsPanel({ data }: { data: CurrentVitalsResponse }) {
 
   return (
     <Card className="shadow-[var(--shadow-card)]">
-      <CardContent className="pt-4">
+      <CardContent className="space-y-3 pt-4">
+        <p className="text-xs leading-snug text-muted-foreground">
+          Status compares each value to an approximate reference interval for this patient&apos;s age cohort (see Trends
+          charts for shaded bands). FiO₂ &gt; room air and any oxygen flow are flagged when therapy is present.
+        </p>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Vital</TableHead>
               <TableHead className="text-right">Value</TableHead>
+              <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-right">Chart time</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((v) => (
-              <TableRow key={v.itemid}>
-                <TableCell className="font-medium">{v.label}</TableCell>
-                <TableCell className="text-right font-tabular">{v.value}</TableCell>
-                <TableCell className="text-right text-muted-foreground text-xs">
-                  {formatChartTime(v.charttime_iso)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {rows.map((v) => {
+              const status = classifyVitalValue(v.itemid, v.value, demographics);
+              return (
+                <TableRow key={v.itemid}>
+                  <TableCell className="font-medium">{v.label}</TableCell>
+                  <TableCell className="text-right font-tabular">{displayValue(v.itemid, v.value)}</TableCell>
+                  <TableCell className="text-center">
+                    {status === "normal" && (
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-600/50 text-emerald-800 dark:text-emerald-400"
+                      >
+                        Normal
+                      </Badge>
+                    )}
+                    {status === "abnormal" && (
+                      <Badge variant="outline" className="border-destructive/60 text-critical">
+                        Abnormal
+                      </Badge>
+                    )}
+                    {status === "unknown" && (
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        —
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">{formatChartTime(v.charttime_iso)}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </CardContent>

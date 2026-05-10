@@ -33,7 +33,13 @@ function describeFactor(p: NewsParameterScore): string {
   return line;
 }
 
-export function NewsScorePanel({ data }: { data: NewsScoreResponse }) {
+export function NewsScorePanel({
+  data,
+  compact = false,
+}: {
+  data: NewsScoreResponse;
+  compact?: boolean;
+}) {
   const elevated = React.useMemo(
     () => data.parameters.filter((p) => p.points >= ELEVATED_POINTS_THRESHOLD),
     [data.parameters],
@@ -59,13 +65,22 @@ export function NewsScorePanel({ data }: { data: NewsScoreResponse }) {
         ))}
       </div>
 
-      <Card className="p-4 shadow-[var(--shadow-card)]" data-panel="news-composite">
+      <Card
+        className={compact ? "p-3 shadow-[var(--shadow-card)]" : "p-4 shadow-[var(--shadow-card)]"}
+        data-panel="news-composite"
+      >
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               NEWS aggregate (0–20)
             </p>
-            <p className="mt-1 font-tabular text-3xl font-semibold tracking-tight text-foreground">
+            <p
+              className={
+                compact
+                  ? "mt-0.5 font-tabular text-2xl font-semibold tracking-tight text-foreground"
+                  : "mt-1 font-tabular text-3xl font-semibold tracking-tight text-foreground"
+              }
+            >
               {data.total_score}
             </p>
           </div>

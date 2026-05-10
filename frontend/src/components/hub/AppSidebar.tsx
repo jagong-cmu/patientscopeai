@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useMatch } from "react-router-dom";
 import { LayoutDashboard, Stethoscope, Users, Eye } from "lucide-react";
 import {
   Sidebar,
@@ -11,13 +11,38 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 
 const nav = [
   { label: "Ward overview", icon: LayoutDashboard, to: "/", end: true },
   { label: "Patients", icon: Users, to: "/patients", end: true },
   { label: "Post-monitoring", icon: Eye, to: "/post-monitoring", end: true },
-];
+] as const;
+
+function SidebarNavItem({
+  item,
+}: {
+  item: { label: string; icon: (typeof nav)[number]["icon"]; to: string; end: boolean };
+}) {
+  const match = useMatch({ path: item.to, end: item.end });
+  const Icon = item.icon;
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={!!match}
+        size="lg"
+        variant="outline"
+        className="rounded-xl shadow-sm transition-shadow hover:shadow-md data-[active=true]:shadow-md [&>svg]:size-5"
+      >
+        <NavLink to={item.to} end={item.end}>
+          <Icon />
+          <span>{item.label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
 export function ClinicalSidebar() {
   return (
@@ -36,22 +61,9 @@ export function ClinicalSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               {nav.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        cn(isActive && "bg-sidebar-accent font-medium text-sidebar-accent-foreground")
-                      }
-                    >
-                      <item.icon className="size-4" />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem key={item.to} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

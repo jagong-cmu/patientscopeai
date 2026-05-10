@@ -9,6 +9,7 @@ import type {
 } from "../api/types";
 import { apiGet } from "../api/client";
 import { HubLayout } from "../components/hub/HubLayout";
+import { PatientRosterCard } from "../components/hub/PatientRosterCard";
 import { NewsBandBadge } from "../components/StatusBadge";
 import {
   Table,
@@ -19,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Collapsible,
   CollapsibleContent,
@@ -80,7 +81,23 @@ export default function WardOverviewPage() {
 
   return (
     <HubLayout title="Ward overview" subtitle={subtitle}>
-      {wardQ.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {wardQ.isLoading && (
+        <div className="space-y-6 animate-in fade-in-0 duration-300" aria-busy="true" aria-label="Loading ward overview">
+          <p className="text-sm text-muted-foreground">Loading ward summary…</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-52 w-full rounded-xl" />
+            <Skeleton className="h-52 w-full rounded-xl" />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-48 rounded-md" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        </div>
+      )}
       {wardQ.error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-critical">
           {wardQ.error instanceof Error ? wardQ.error.message : String(wardQ.error)}
@@ -88,118 +105,122 @@ export default function WardOverviewPage() {
       )}
 
       {data && (
-        <>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/patients">Patient roster</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/post-monitoring">Post-monitoring</Link>
-            </Button>
-          </div>
-
-          <Card className="shadow-[var(--shadow-card)]">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Bed utilization</CardTitle>
-              <CardDescription>
-                {data.census_count} patients · {data.pending_admissions_count} pending admission
-                {data.pending_admissions_count === 1 ? "" : "s"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-end gap-6">
-                <div>
-                  <p className="text-4xl font-semibold tabular-nums tracking-tight">
-                    {data.census_count}
-                    <span className="text-muted-foreground"> / </span>
-                    {data.bed_capacity}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">Beds in use</p>
-                </div>
-                <div className="text-sm">
-                  <p className="font-medium tabular-nums">{Math.max(0, data.bed_capacity - data.census_count)}</p>
-                  <p className="text-muted-foreground">Available beds</p>
-                </div>
-              </div>
-
-              <Collapsible>
-                <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-foreground hover:underline">
-                  <ChevronDown className="size-4 transition-transform [[data-state=open]_&]:rotate-180" />
-                  NEWS distribution & grid
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-4 space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Low {bandCounts.low} · Medium {bandCounts.medium} · High {bandCounts.high}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-success" aria-hidden />
-                      Low
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-warning" aria-hidden />
-                      Medium
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2.5 rounded-sm bg-critical" aria-hidden />
-                      High
-                    </span>
+        <div className="space-y-6">
+          <div className="grid gap-6 animate-in fade-in-0 duration-300 lg:grid-cols-2 lg:items-start">
+            <Card className="shadow-[var(--shadow-card)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Bed utilization</CardTitle>
+                <CardDescription>
+                  {data.census_count} patients · {data.pending_admissions_count} pending admission
+                  {data.pending_admissions_count === 1 ? "" : "s"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-end gap-6">
+                  <div>
+                    <p className="text-4xl font-semibold tabular-nums tracking-tight">
+                      {data.census_count}
+                      <span className="text-muted-foreground"> / </span>
+                      {data.bed_capacity}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">Beds in use</p>
                   </div>
-                  {staysQ.isLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading roster…</p>
-                  ) : (
-                    <div className="grid max-h-48 grid-cols-[repeat(auto-fill,minmax(1.25rem,1fr))] gap-1 overflow-y-auto sm:max-h-none">
-                      {stays.map((row) => (
-                        <Link
-                          key={row.stay_id}
-                          to={`/patients/${row.stay_id}`}
-                          title={`${row.display_patient_id} · NEWS ${row.news_total}`}
-                          className={cn(
-                            "size-5 shrink-0 rounded-sm shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            newsSquareClass(row.news_band),
-                          )}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-          </Card>
+                  <div className="text-sm">
+                    <p className="font-medium tabular-nums">{Math.max(0, data.bed_capacity - data.census_count)}</p>
+                    <p className="text-muted-foreground">Available beds</p>
+                  </div>
+                </div>
 
-          {alertsQ.data && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-foreground hover:underline">
+                    <ChevronDown className="size-4 transition-transform [[data-state=open]_&]:rotate-180" />
+                    NEWS distribution & grid
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Low {bandCounts.low} · Medium {bandCounts.medium} · High {bandCounts.high}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-sm bg-success" aria-hidden />
+                        Low
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-sm bg-warning" aria-hidden />
+                        Medium
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-sm bg-critical" aria-hidden />
+                        High
+                      </span>
+                    </div>
+                    {staysQ.isLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading roster for grid…</p>
+                    ) : (
+                      <div className="grid max-h-48 grid-cols-[repeat(auto-fill,minmax(1.25rem,1fr))] gap-1 overflow-y-auto sm:max-h-none">
+                        {stays.map((row) => (
+                          <Link
+                            key={row.stay_id}
+                            to={`/patients/${row.stay_id}`}
+                            title={`${row.display_patient_id} · NEWS ${row.news_total}`}
+                            className={cn(
+                              "size-5 shrink-0 rounded-sm shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              newsSquareClass(row.news_band),
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
+
             <Card className="shadow-[var(--shadow-card)]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Critical alerts</CardTitle>
                 <CardDescription>Labs and monitored patients</CardDescription>
               </CardHeader>
               <CardContent>
-                {alertsQ.data.alerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No critical alerts right now.</p>
-                ) : (
-                  <ul className="max-h-64 space-y-3 overflow-y-auto text-sm">
-                    {alertsQ.data.alerts.map((a) => (
-                      <li key={a.id} className="border-b border-border pb-3 last:border-0">
-                        <p className="text-foreground">{a.message}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {new Date(a.occurred_at).toLocaleString()}
-                          {a.stay_id != null ? (
-                            <>
-                              {" · "}
-                              <Link className={patientLinkClass} to={`/patients/${a.stay_id}`}>
-                                Open stay
-                              </Link>
-                            </>
-                          ) : null}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                {alertsQ.isLoading && (
+                  <div className="space-y-3" aria-busy="true" aria-label="Loading ward alerts">
+                    <p className="text-sm text-muted-foreground">Loading alerts…</p>
+                    <Skeleton className="h-14 w-full" />
+                    <Skeleton className="h-14 w-full" />
+                  </div>
+                )}
+                {!alertsQ.isLoading && alertsQ.data && (
+                  <>
+                    {alertsQ.data.alerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No critical alerts right now.</p>
+                    ) : (
+                      <ul className="max-h-64 space-y-3 overflow-y-auto text-sm">
+                        {alertsQ.data.alerts.map((a) => (
+                          <li key={a.id} className="border-b border-border pb-3 last:border-0">
+                            <p className="text-foreground">{a.message}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {new Date(a.occurred_at).toLocaleString()}
+                              {a.stay_id != null ? (
+                                <>
+                                  {" · "}
+                                  <Link className={patientLinkClass} to={`/patients/${a.stay_id}`}>
+                                    Open stay
+                                  </Link>
+                                </>
+                              ) : null}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+                {!alertsQ.isLoading && alertsQ.isError && (
+                  <p className="text-sm text-muted-foreground">Alerts unavailable.</p>
                 )}
               </CardContent>
             </Card>
-          )}
-          {alertsQ.isError && <p className="text-sm text-muted-foreground">Alerts unavailable.</p>}
+          </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="shadow-[var(--shadow-card)]">
@@ -221,7 +242,6 @@ export default function WardOverviewPage() {
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Patient</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
-                        <TableHead>Band</TableHead>
                         <TableHead className="text-right">ICU LOS (h)</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -234,9 +254,11 @@ export default function WardOverviewPage() {
                               {row.display_patient_id}
                             </Link>
                           </TableCell>
-                          <TableCell className="text-right font-tabular">{row.news_total}</TableCell>
-                          <TableCell>
-                            <NewsBandBadge band={row.news_band} compact />
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center justify-end gap-2">
+                              <span className="font-tabular">{row.news_total}</span>
+                              <NewsBandBadge band={row.news_band} compact />
+                            </span>
                           </TableCell>
                           <TableCell className="text-right font-tabular">
                             {row.icu_los_hours != null ? row.icu_los_hours.toFixed(1) : "—"}
@@ -264,7 +286,6 @@ export default function WardOverviewPage() {
                         <TableHead className="w-10">#</TableHead>
                         <TableHead>Patient</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
-                        <TableHead>Band</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -276,9 +297,11 @@ export default function WardOverviewPage() {
                               {row.display_patient_id}
                             </Link>
                           </TableCell>
-                          <TableCell className="text-right font-tabular">{row.news_total}</TableCell>
-                          <TableCell>
-                            <NewsBandBadge band={row.news_band} compact />
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center justify-end gap-2">
+                              <span className="font-tabular">{row.news_total}</span>
+                              <NewsBandBadge band={row.news_band} compact />
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -288,7 +311,9 @@ export default function WardOverviewPage() {
               </CardContent>
             </Card>
           </div>
-        </>
+
+          <PatientRosterCard rows={stays} isLoading={staysQ.isLoading} />
+        </div>
       )}
     </HubLayout>
   );
