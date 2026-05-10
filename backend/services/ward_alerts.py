@@ -1,13 +1,16 @@
 """
 Critical ward alerts: lab trajectory thresholds/acceleration and NEWS elevation on watched stays.
+Optional rotating demo alerts (same-minute bucket) for UI drill visualization.
 """
 from __future__ import annotations
 
-import hashlib
+import os
+import random
 from datetime import datetime, timezone
 from typing import Any
 
 from backend.schemas import WardAlertItem, WardAlertPatientTag
+from backend.services.patient_display import patient_id_numeric, synthetic_patient_name
 from backend.services.cohort_split import split_in_unit_vs_pending, ward_bed_capacity
 from backend.services.discharge_events_store import get_discharged_stay_ids
 from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
@@ -19,28 +22,6 @@ from backend.services.watchlist_store import list_watchlist_docs
 LACTATE = 50813
 CREATININE = 50912
 WBC = 51301
-
-SURNAMES = (
-    "Chen",
-    "Patel",
-    "Garcia",
-    "Nguyen",
-    "Okafor",
-    "Kim",
-    "Martinez",
-    "Brown",
-    "Singh",
-    "Lee",
-)
-GIVEN = ("W", "A", "M", "J", "R", "S", "L", "K", "D", "T")
-
-
-def synthetic_name(subject_id: int) -> str:
-    h = hashlib.sha256(str(subject_id).encode()).hexdigest()
-    si = int(h[:8], 16) % len(SURNAMES)
-    gi = int(h[8:16], 16) % len(GIVEN)
-    return f"{SURNAMES[si]}, {GIVEN[gi]}."
-
 
 def _iso(ct: Any) -> str:
     if ct is None:
@@ -104,6 +85,42 @@ def discharge_queue_stay_ids(enriched: list[dict]) -> set[int]:
     return {int(x["stay_id"]) for x in dq}
 
 
+def _demo_alerts_enabled() -> bool:
+    return (os.getenv("WARD_DEMO_ALERTS") or "1").strip() != "0"
+
+
+def build_rotating_demo_alerts(minute_bucket: int) -> list[WardAlertItem]:
+    """Deterministic fake alerts that change each minute (seed = UTC minute bucket)."""
+    rng = random.Random(minute_bucket)
+    n = rng.randint(2, 4)
+    now = datetime.now(timezone.utc).isoformat()
+    templates = (
+        "Simulated escalation — bedside review suggested for {name} (Patient ID {pid}): ventilator wean check per protocol.",
+        "Demo trace — coagulation panel follow-up for {name} (Patient ID {pid}); confirm draw time with nursing.",
+        "Simulated ward drill — SpO₂ ladder verification for {name} (Patient ID {pid}) after therapy change.",
+        "Demo notification — insulin infusion safety cross-check for {name} (Patient ID {pid}).",
+        "Simulated throughput ping — pending admission overlap review with {name} (Patient ID {pid}) primary team.",
+        "Demo surveillance — urine output cluster flagged for {name} (Patient ID {pid}); validate I/O totals.",
+    )
+    out: list[WardAlertItem] = []
+    for i in range(n):
+        fake_subj = rng.randint(20_000, 298_000)
+        pid = patient_id_numeric(fake_subj)
+        name = synthetic_patient_name(fake_subj)
+        msg = rng.choice(templates).format(name=name, pid=pid)
+        out.append(
+            WardAlertItem(
+                id=f"demo-{minute_bucket}-{i}",
+                category="demo_simulation",
+                message=msg,
+                occurred_at=now,
+                stay_id=None,
+                tags=["icu"],
+            )
+        )
+    return out
+
+
 def build_ward_alerts() -> list[WardAlertItem]:
     enriched = _ward_enriched_rows()
     dq_ids = discharge_queue_stay_ids(enriched)
@@ -125,7 +142,7 @@ def build_ward_alerts() -> list[WardAlertItem]:
     for row in enriched:
         stay_id = int(row["stay_id"])
         sid = int(row["subject_id"])
-        nm = synthetic_name(sid)
+        nm = synthetic_patient_name(sid)
         labs = get_labs_last48h(stay_id)
         by_item: dict[int, list[dict]] = {}
         for lab in labs:
@@ -225,7 +242,7 @@ def build_ward_alerts() -> list[WardAlertItem]:
         if nt < 7 and row["news_band"] != "high":
             continue
         sid = int(row["subject_id"])
-        nm = synthetic_name(sid)
+        nm = synthetic_patient_name(sid)
         dq_note = " · Discharge-queue candidate" if stay_id in dq_ids else ""
         alerts.append(
             WardAlertItem(
@@ -237,6 +254,10 @@ def build_ward_alerts() -> list[WardAlertItem]:
                 tags=_patient_tags(stay_id, watch_stays),
             )
         )
+
+    minute_bucket = int(datetime.now(timezone.utc).timestamp() // 60)
+    if _demo_alerts_enabled():
+        alerts = build_rotating_demo_alerts(minute_bucket) + alerts
 
     alerts.sort(key=lambda a: a.occurred_at, reverse=True)
     return alerts[:40]

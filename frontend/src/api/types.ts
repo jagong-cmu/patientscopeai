@@ -23,7 +23,9 @@ export interface NewsScoreResponse {
 
 export interface WardPreviewRow {
   stay_id: number;
+  /** Five-digit anonymized id */
   display_patient_id: string;
+  patient_name: string;
   news_total: number;
   news_band: NewsClinicalBand;
   icu_los_hours?: number | null;
@@ -49,7 +51,7 @@ export interface WardSummaryResponse {
   high_risk_preview: WardPreviewRow[];
 }
 
-export type WardAlertCategory = "lab_trajectory" | "news_context";
+export type WardAlertCategory = "lab_trajectory" | "news_context" | "demo_simulation";
 
 export type WardAlertPatientTag = "icu" | "post_monitoring";
 
@@ -86,6 +88,7 @@ export interface WatchlistRow {
   subject_id: number;
   index_stay_id: number;
   display_patient_id: string;
+  patient_name: string;
   added_at: string;
   news_total: number;
   news_band: NewsClinicalBand;
@@ -203,6 +206,7 @@ export interface AuditResponse {
 export interface StayListRow {
   stay_id: number;
   display_patient_id: string;
+  patient_name: string;
   age_years: number | null;
   gender: string | null;
   primary_diagnosis: string | null;
@@ -234,6 +238,9 @@ export interface CurrentVitalsResponse {
 export interface PatientSummary {
   stay_id: number;
   subject_id: number;
+  /** Same five-digit id as roster `display_patient_id` */
+  patient_display_id?: string;
+  patient_name?: string;
   hadm_id: number;
   gender: string | null;
   age_years: number | null;

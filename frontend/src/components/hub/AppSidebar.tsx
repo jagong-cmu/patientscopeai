@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const nav = [
-  { label: "Ward Overview", icon: LayoutDashboard, to: "/", end: true },
+  { label: "Ward Overview", icon: LayoutDashboard, to: "/ward", end: true },
   { label: "Patients", icon: Users, to: "/patients", end: true },
   { label: "Post-Monitoring", icon: Eye, to: "/post-monitoring", end: true },
 ] as const;

@@ -14,7 +14,7 @@ export default function PatientsListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["stays"],
     queryFn: () => apiGet<StayListResponse>("/api/stays"),
-    staleTime: 60_000,
+    staleTime: 120_000,
     gcTime: 300_000,
   });
 
@@ -24,6 +24,7 @@ export default function PatientsListPage() {
     return rows.filter((r) => {
       if (!q) return true;
       if (r.display_patient_id.toLowerCase().includes(q)) return true;
+      if (r.patient_name.toLowerCase().includes(q)) return true;
       if (String(r.stay_id).includes(q)) return true;
       if ((r.primary_diagnosis ?? "").toLowerCase().includes(q)) return true;
       return false;
@@ -36,6 +37,7 @@ export default function PatientsListPage() {
     return rows.filter((r) => {
       if (!q) return true;
       if (r.display_patient_id.toLowerCase().includes(q)) return true;
+      if (r.patient_name.toLowerCase().includes(q)) return true;
       if (String(r.stay_id).includes(q)) return true;
       if ((r.primary_diagnosis ?? "").toLowerCase().includes(q)) return true;
       return false;

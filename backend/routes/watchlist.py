@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.schemas import WatchlistCreate, WatchlistListResponse, WatchlistRow
 from backend.services.news import compute_news_score
+from backend.services.patient_display import patient_id_numeric, synthetic_patient_name
 from backend.services.watchlist_store import (
     add_watchlist_entry,
     list_watchlist_docs,
@@ -14,10 +15,6 @@ FRESHNESS_NOTE = (
     "NEWS is recomputed from the index ICU stay's last 24h chart window in MIMIC (historical snapshot). "
     "Live post-discharge telemetry is not connected in this demo."
 )
-
-
-def _anon(subject_id: int) -> str:
-    return f"Patient {subject_id % 10000:05d}"
 
 
 def _added_at_str(d: dict) -> str:
@@ -84,7 +81,8 @@ def post_watchlist(body: WatchlistCreate):
     return WatchlistRow(
         subject_id=body.subject_id,
         index_stay_id=body.index_stay_id,
-        display_patient_id=_anon(body.subject_id),
+        display_patient_id=patient_id_numeric(body.subject_id),
+        patient_name=synthetic_patient_name(body.subject_id),
         added_at=added_at,
         news_total=nt,
         news_band=nb,

@@ -10,13 +10,10 @@ from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
 from backend.services.mimic import list_icu_stays
 from backend.services.models import predict_risk
 from backend.services.news import compute_news_score
+from backend.services.patient_display import patient_id_numeric, synthetic_patient_name
 from backend.services.ward_alerts import build_ward_alerts
 
 router = APIRouter()
-
-
-def _anon(subject_id: int) -> str:
-    return f"Patient {subject_id % 10000:05d}"
 
 
 def _enrich_ward_row(r: dict) -> dict | None:
@@ -30,10 +27,12 @@ def _enrich_ward_row(r: dict) -> dict | None:
     if rr and rr.risks:
         prob = float(rr.risks[0].probability)
 
+    sub = int(r["subject_id"])
     return {
         "stay_id": sid,
-        "subject_id": int(r["subject_id"]),
-        "display_patient_id": _anon(int(r["subject_id"])),
+        "subject_id": sub,
+        "display_patient_id": patient_id_numeric(sub),
+        "patient_name": synthetic_patient_name(sub),
         "news_total": ns.total_score,
         "news_band": ns.clinical_risk_band,
         "icu_los_hours": float(los) if los is not None else None,
@@ -98,6 +97,7 @@ def ward_summary():
         return WardPreviewRow(
             stay_id=d["stay_id"],
             display_patient_id=d["display_patient_id"],
+            patient_name=d["patient_name"],
             news_total=d["news_total"],
             news_band=d["news_band"],
             icu_los_hours=d["icu_los_hours"],

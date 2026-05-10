@@ -106,7 +106,8 @@ class AuditResponse(BaseModel):
 
 class WardPreviewRow(BaseModel):
     stay_id: int
-    display_patient_id: str
+    display_patient_id: str    # five-digit anonymized id (no "Patient" prefix)
+    patient_name: str          # deterministic synthetic full name
     news_total: int
     news_band: Literal["low", "medium", "high"]
     icu_los_hours: Optional[float] = None
@@ -125,7 +126,7 @@ class WardSummaryResponse(BaseModel):
 
 class WardAlertItem(BaseModel):
     id: str
-    category: Literal["lab_trajectory", "news_context"]
+    category: Literal["lab_trajectory", "news_context", "demo_simulation"]
     message: str
     occurred_at: str
     stay_id: Optional[int] = None
@@ -161,6 +162,7 @@ class WatchlistRow(BaseModel):
     subject_id: int
     index_stay_id: int
     display_patient_id: str
+    patient_name: str
     added_at: str
     news_total: int
     news_band: Literal["low", "medium", "high"]
@@ -192,7 +194,8 @@ class DischargeEventResponse(BaseModel):
 
 class StayListRow(BaseModel):
     stay_id: int
-    display_patient_id: str     # anonymized label e.g. Patient 10001
+    display_patient_id: str     # five-digit anonymized id
+    patient_name: str           # deterministic synthetic full name
     age_years: Optional[float]
     gender: Optional[str]
     primary_diagnosis: Optional[str]

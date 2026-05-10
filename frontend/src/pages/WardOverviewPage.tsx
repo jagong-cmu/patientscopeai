@@ -45,7 +45,12 @@ const patientLinkClass =
 /** Sort tiles: green cluster first, then amber, then red (stable by stay id). */
 const BAND_SORT: Record<NewsClinicalBand, number> = { low: 0, medium: 1, high: 2 };
 
-export default function WardOverviewPage() {
+export type WardOverviewPageProps = {
+  /** Non-interactive layer under the landing splash; pauses alert polling */
+  previewBehindLanding?: boolean;
+};
+
+export default function WardOverviewPage({ previewBehindLanding = false }: WardOverviewPageProps) {
   const subtitle = new Intl.DateTimeFormat(undefined, {
     weekday: "long",
     month: "short",
@@ -55,14 +60,14 @@ export default function WardOverviewPage() {
   const wardQ = useQuery({
     queryKey: ["ward-summary"],
     queryFn: () => apiGet<WardSummaryResponse>("/api/ward/summary"),
-    staleTime: 60_000,
+    staleTime: 120_000,
     gcTime: 300_000,
   });
 
   const staysQ = useQuery({
     queryKey: ["stays"],
     queryFn: () => apiGet<StayListResponse>("/api/stays"),
-    staleTime: 60_000,
+    staleTime: 120_000,
     gcTime: 300_000,
   });
 
@@ -70,8 +75,9 @@ export default function WardOverviewPage() {
     queryKey: ["ward-alerts"],
     queryFn: () => apiGet<WardAlertsResponse>("/api/ward/alerts"),
     retry: false,
-    staleTime: 45_000,
+    staleTime: 60_000,
     gcTime: 300_000,
+    refetchInterval: previewBehindLanding ? false : 60_000,
   });
 
   const data = wardQ.data;
@@ -123,7 +129,11 @@ export default function WardOverviewPage() {
       : undefined;
 
   return (
-    <HubLayout title="Ward Overview" subtitle={subtitle}>
+    <HubLayout
+      title="Ward Overview"
+      subtitle={subtitle}
+      splashBackdrop={previewBehindLanding}
+    >
       {wardQ.isLoading && (
         <div className="space-y-6 animate-in fade-in-0 duration-300" aria-busy="true" aria-label="Loading ward overview">
           <p className="text-sm text-muted-foreground">Loading Ward Summary…</p>
@@ -215,7 +225,7 @@ export default function WardOverviewPage() {
                           <Link
                             key={row.stay_id}
                             to={`/patients/${row.stay_id}`}
-                            title={`${row.display_patient_id} · NEWS ${row.news_total}`}
+                            title={`${row.patient_name} · Patient ID ${row.display_patient_id} · NEWS ${row.news_total}`}
                             className={cn(
                               "block aspect-square w-full min-h-[1.625rem] rounded-sm shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[1.75rem]",
                               newsSquareClass(row.news_band),
@@ -276,6 +286,14 @@ export default function WardOverviewPage() {
                                         Post-Monitoring
                                       </Badge>
                                     ) : null}
+                                    {a.category === "demo_simulation" ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-muted text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                                      >
+                                        Demo
+                                      </Badge>
+                                    ) : null}
                                   </div>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
@@ -322,7 +340,8 @@ export default function WardOverviewPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10">#</TableHead>
-                        <TableHead>Patient</TableHead>
+                        <TableHead className="font-tabular">Patient ID</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead className="text-right">72h Risk</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
                       </TableRow>
@@ -331,9 +350,14 @@ export default function WardOverviewPage() {
                       {data.discharge_queue_preview.map((row, i) => (
                         <TableRow key={row.stay_id}>
                           <TableCell className="font-tabular text-muted-foreground">{i + 1}</TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-tabular text-muted-foreground">
                             <Link className={patientLinkClass} to={`/patients/${row.stay_id}`}>
                               {row.display_patient_id}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <Link className={patientLinkClass} to={`/patients/${row.stay_id}`}>
+                              {row.patient_name}
                             </Link>
                           </TableCell>
                           <TableCell className="text-right font-tabular">
@@ -368,7 +392,8 @@ export default function WardOverviewPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-10">#</TableHead>
-                        <TableHead>Patient</TableHead>
+                        <TableHead className="font-tabular">Patient ID</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead className="text-right">72h Risk</TableHead>
                         <TableHead className="text-right">NEWS</TableHead>
                       </TableRow>
@@ -377,9 +402,14 @@ export default function WardOverviewPage() {
                       {data.high_risk_preview.map((row, i) => (
                         <TableRow key={row.stay_id}>
                           <TableCell className="font-tabular text-muted-foreground">{i + 1}</TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-tabular text-muted-foreground">
                             <Link className={patientLinkClass} to={`/patients/${row.stay_id}`}>
                               {row.display_patient_id}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <Link className={patientLinkClass} to={`/patients/${row.stay_id}`}>
+                              {row.patient_name}
                             </Link>
                           </TableCell>
                           <TableCell className="text-right font-tabular">

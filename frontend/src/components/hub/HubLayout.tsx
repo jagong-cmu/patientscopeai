@@ -18,19 +18,22 @@ export function HubLayout({
   subtitle,
   topbarBack,
   topbarCenter,
+  splashBackdrop = false,
 }: {
   children: ReactNode;
   title?: string;
   subtitle?: string;
   topbarBack?: { label: string; href: string };
   topbarCenter?: string;
+  /** Landing splash: omit sidebar + trigger so Radix layout stays stable behind overlay */
+  splashBackdrop?: boolean;
 }) {
   return (
     <>
-      <ClinicalSidebar />
+      {!splashBackdrop ? <ClinicalSidebar /> : null}
       <SidebarInset className="flex min-h-svh flex-col">
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:px-6">
-          <SidebarTrigger className="-ml-1" />
+          {!splashBackdrop ? <SidebarTrigger className="-ml-1" /> : <div className="w-9 shrink-0" aria-hidden />}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {topbarBack && (
               <Button variant="ghost" size="sm" className="shrink-0" asChild>

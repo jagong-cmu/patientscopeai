@@ -174,7 +174,11 @@ export default function PatientDetailPage() {
   const errCore = results.slice(0, 2).find((q) => q.error)?.error as Error | undefined;
 
   const patient = patientQ.data;
-  const displayPatient = patient ? `Patient ${String(patient.subject_id % 10000).padStart(5, "0")}` : "—";
+  const patientIdStr =
+    patient?.patient_display_id ??
+    (patient ? String(patient.subject_id % 10000).padStart(5, "0") : "");
+  const patientName = patient?.patient_name?.trim() ?? "";
+  const displayPatient = patient ? (patientName || `ID ${patientIdStr}`) : "—";
 
   const timingLoading = dischargeTimingQ.isLoading;
   const timingErr = dischargeTimingQ.error;
@@ -222,9 +226,13 @@ export default function PatientDetailPage() {
 
   return (
     <HubLayout
-      title={`${displayPatient} · Stay ${id}`}
+      title={patientName ? `${patientName} · Stay ${id}` : `${displayPatient} · Stay ${id}`}
       topbarBack={{ label: "Patients", href: "/patients" }}
-      topbarCenter={`${displayPatient} — Stay ${id}`}
+      topbarCenter={
+        patientName
+          ? `${patientName} — Patient ID ${patientIdStr} — Stay ${id}`
+          : `Patient ID ${patientIdStr} — Stay ${id}`
+      }
     >
       <Dialog
         open={dischargeOpen}
@@ -329,8 +337,10 @@ export default function PatientDetailPage() {
                 <CardHeader className="shrink-0 border-b border-border bg-muted/20 pb-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <CardTitle className="text-xl">{displayPatient}</CardTitle>
-                      <CardDescription className="mt-1 text-sm">ICU stay {id}</CardDescription>
+                      <CardTitle className="text-xl">{patientName || `Patient ID ${patientIdStr}`}</CardTitle>
+                      <CardDescription className="mt-1 text-sm">
+                        Patient ID {patientIdStr} · ICU stay {id}
+                      </CardDescription>
                     </div>
                     {!patient.discharged_from_icu ? (
                       <Button

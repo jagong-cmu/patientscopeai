@@ -10,6 +10,7 @@ from backend.services.icu_scan_limit import ICU_STAY_SCAN_LIMIT
 from backend.services.mimic import list_icu_stays
 from backend.services.models import predict_risk
 from backend.services.news import compute_news_score, news_stub_from_subject
+from backend.services.patient_display import patient_id_numeric, synthetic_patient_name
 
 router = APIRouter()
 _DEFAULT_DEMO_STAY_ID = "31269608"
@@ -22,10 +23,6 @@ def _demo_stay_id() -> int:
         return int(raw)
     except ValueError:
         return int(_DEFAULT_DEMO_STAY_ID)
-
-
-def _anon_label(subject_id: int) -> str:
-    return f"Patient {subject_id % 10000:05d}"
 
 
 def _stay_list_row(r: dict, demo_id: int) -> StayListRow:
@@ -43,9 +40,11 @@ def _stay_list_row(r: dict, demo_id: int) -> StayListRow:
         prob = float(rr.risks[0].probability)
     age = r.get("age_years")
     los = r.get("icu_los_hours")
+    sub = int(r["subject_id"])
     return StayListRow(
         stay_id=sid,
-        display_patient_id=_anon_label(r["subject_id"]),
+        display_patient_id=patient_id_numeric(sub),
+        patient_name=synthetic_patient_name(sub),
         age_years=float(age) if age is not None else None,
         gender=r.get("gender"),
         primary_diagnosis=r.get("primary_diagnosis"),

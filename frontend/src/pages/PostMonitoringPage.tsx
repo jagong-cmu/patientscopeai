@@ -84,7 +84,8 @@ export default function PostMonitoringPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Patient</TableHead>
+                    <TableHead className="font-tabular">Patient ID</TableHead>
+                    <TableHead>Name</TableHead>
                     <TableHead className="text-right">NEWS</TableHead>
                     <TableHead>Data freshness</TableHead>
                     <TableHead className="text-right">Added</TableHead>
@@ -94,9 +95,14 @@ export default function PostMonitoringPage() {
                 <TableBody>
                   {rows.map((row) => (
                     <TableRow key={row.subject_id}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-tabular text-muted-foreground">
                         <Link className="text-primary hover:underline" to={`/patients/${row.index_stay_id}`}>
                           {row.display_patient_id}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Link className="text-primary hover:underline" to={`/patients/${row.index_stay_id}`}>
+                          {row.patient_name}
                         </Link>
                       </TableCell>
                       <TableCell className="text-right">

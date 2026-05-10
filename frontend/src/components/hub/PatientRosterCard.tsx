@@ -74,7 +74,7 @@ export function PatientRosterCard({
                 </Label>
                 <Input
                   id="roster-search"
-                  placeholder="Search name, stay, diagnosis…"
+                  placeholder="Search name, patient ID, stay, diagnosis…"
                   value={search}
                   onChange={(e) => onSearchChange(e.target.value)}
                 />
@@ -121,7 +121,8 @@ export function PatientRosterCard({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Patient</TableHead>
+                  <TableHead className="font-tabular">Patient ID</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead className="text-right">Age</TableHead>
                   <TableHead>Sex</TableHead>
                   <TableHead className="max-w-[240px]">Diagnosis</TableHead>
@@ -133,9 +134,14 @@ export function PatientRosterCard({
               <TableBody>
                 {rows.map((row) => (
                   <TableRow key={row.stay_id}>
-                    <TableCell>
+                    <TableCell className="font-tabular text-muted-foreground">
                       <Link className={patientRosterLinkClass} to={`/patients/${row.stay_id}`}>
                         {row.display_patient_id}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link className={patientRosterLinkClass} to={`/patients/${row.stay_id}`}>
+                        {row.patient_name}
                       </Link>
                     </TableCell>
                     <TableCell className="text-right font-tabular">
