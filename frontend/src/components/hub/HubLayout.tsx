@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AppSidebar } from "./AppSidebar";
-import { AppTopbar } from "./AppTopbar";
+import { Button } from "@/components/ui/button";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { ClinicalSidebar } from "./AppSidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const showProdApiMissingBanner =
   import.meta.env.PROD &&
@@ -22,37 +25,49 @@ export function HubLayout({
   topbarCenter?: string;
 }) {
   return (
-    <div className="flex min-h-screen bg-background">
-      <AppSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppTopbar backTo={topbarBack} centerTitle={topbarCenter} />
-        <main className="flex-1 space-y-6 p-6">
-          {showProdApiMissingBanner && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertTitle>Backend URL not set</AlertTitle>
-              <AlertDescription>
-                The roster calls your FastAPI server. For static hosting, add{" "}
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">VITE_API_BASE</code>{" "}
-                (your API origin, no trailing slash) in Vercel → Environment Variables, then redeploy.
-              </AlertDescription>
-            </Alert>
-          )}
-          {(title ?? subtitle) && (
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                {title && <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-                {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    <>
+      <ClinicalSidebar />
+      <SidebarInset className="flex min-h-svh flex-col">
+        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur md:px-6">
+          <SidebarTrigger className="-ml-1" />
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {topbarBack && (
+              <Button variant="ghost" size="sm" className="shrink-0" asChild>
+                <Link to={topbarBack.href}>{topbarBack.label}</Link>
+              </Button>
+            )}
+            {topbarCenter && (
+              <p className="hidden truncate text-sm font-medium text-foreground md:block lg:hidden">{topbarCenter}</p>
+            )}
+          </div>
+          <Avatar className="size-9 shrink-0">
+            <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">PA</AvatarFallback>
+          </Avatar>
+        </header>
+        <div className="flex flex-1 flex-col">
+          <main className="flex-1 space-y-6 p-6">
+            {showProdApiMissingBanner && (
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Backend URL not set</AlertTitle>
+                <AlertDescription>
+                  Add <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">VITE_API_BASE</code> in your
+                  deployment environment.
+                </AlertDescription>
+              </Alert>
+            )}
+            {(title ?? subtitle) && (
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  {title && <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
+                  {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+                </div>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
-                <span className="size-2 animate-pulse rounded-full bg-success" />
-                Live · PatientScope AI
-              </span>
-            </div>
-          )}
-          {children}
-        </main>
-      </div>
-    </div>
+            )}
+            {children}
+          </main>
+        </div>
+      </SidebarInset>
+    </>
   );
 }

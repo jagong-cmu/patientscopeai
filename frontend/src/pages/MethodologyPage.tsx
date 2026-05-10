@@ -18,20 +18,41 @@ export default function MethodologyPage() {
               (operational rules in repo <span className="font-tabular">sql/</span>).
             </p>
             <p>
-              Additional risk cards marked “not modeled” are scope placeholders — not hidden predictions.
+              The UI surfaces a single trained readmission-risk definition; definitions reserved for future work are not shown as hidden predictions.
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-[var(--shadow-card)]">
           <CardHeader>
-            <CardTitle className="text-lg">Readiness & model</CardTitle>
+            <CardTitle className="text-lg">NEWS & risk model</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
             <p>
-              Readiness is rule-based (four components); see <span className="font-tabular">docs/scoring_rubric.md</span>.
-              Risk uses HistGradientBoosting on Postgres-derived features; trajectory bands are illustrative extrapolations,
-              not validated forecasts.
+              <strong className="text-foreground">NEWS</strong> (National Early Warning Score) is computed from the latest structured vitals in a 24h chart window per ICU stay, aligned with UK RCP NEWS2 tables (SpO₂ Scale 1 in this build).
+              Exact item IDs and known gaps are documented in <span className="font-tabular">docs/news2_mapping.md</span>.
+              Ward occupancy uses census vs configurable <span className="font-tabular">WARD_BED_CAPACITY</span> on <span className="font-tabular">GET /api/ward/summary</span>.
+            </p>
+            <p>
+              <strong className="text-foreground">Post-Monitoring</strong> entries use the same Mongo-backed watchlist API when <span className="font-tabular">MONGODB_URI</span> is set; the UI is a <strong className="text-foreground">global demo</strong> (no per-user auth). NEWS is refreshed from the last available MIMIC chart data — not continuous remote monitoring.
+            </p>
+            <p>
+              <strong className="text-foreground">Discharge destination</strong> logging (<span className="font-tabular">POST /api/discharge-events</span>) also requires MongoDB for persistence.
+            </p>
+            <p>
+              Risk uses a Random Forest (mean imputation, optional SMOTE refit when enabled at train time) on
+              Postgres-derived features.
+            </p>
+            <p>
+              <strong className="text-foreground">Snapshot risk</strong> is one probability per stay from chart/lab features
+              anchored at ICU exit (training definition). The UI may also show{" "}
+              <strong className="text-foreground">discharge timing sensitivity</strong>: the same model evaluated on
+              heuristic forward-adjusted features for “now” vs delayed discharge — exploratory counterfactuals, not a
+              calibrated minute-by-minute risk trajectory.
+            </p>
+            <p>
+              Brief score explanations list inputs with the highest global feature importance from training and compare this
+              patient to cohort distributions — association only, not causal attribution.
             </p>
           </CardContent>
         </Card>
@@ -50,7 +71,7 @@ export default function MethodologyPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           <Link className="text-primary underline" to="/">
-            ← ICU overview
+            ← Ward overview
           </Link>
         </p>
       </div>

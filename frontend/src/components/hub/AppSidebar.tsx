@@ -1,57 +1,63 @@
 import { NavLink } from "react-router-dom";
-import { Activity, BookOpen, LayoutDashboard, Stethoscope } from "lucide-react";
+import { LayoutDashboard, Stethoscope, Users, Eye } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+} from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { label: "ICU overview", icon: LayoutDashboard, to: "/", end: true },
-  { label: "Methodology", icon: BookOpen, to: "/methodology", end: true },
+  { label: "Ward overview", icon: LayoutDashboard, to: "/", end: true },
+  { label: "Patients", icon: Users, to: "/patients", end: true },
+  { label: "Post-monitoring", icon: Eye, to: "/post-monitoring", end: true },
 ];
 
-export function AppSidebar() {
+export function ClinicalSidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
-      <div className="flex h-16 items-center gap-2.5 border-b border-border px-6">
-        <div className="grid size-9 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elevated)]">
-          <Stethoscope className="size-5" />
+    <Sidebar collapsible="icon" variant="inset">
+      <SidebarHeader className="border-b border-sidebar-border p-4">
+        <div className="flex items-center gap-2.5">
+          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-elevated)]">
+            <Stethoscope className="size-5" />
+          </div>
+          <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
+            <p className="truncate text-sm font-semibold">PatientScope</p>
+            <p className="truncate text-xs text-muted-foreground">ICU support</p>
+          </div>
         </div>
-        <div className="leading-tight">
-          <p className="text-sm font-semibold">PatientScope AI</p>
-          <p className="text-xs text-muted-foreground">Discharge readiness</p>
-        </div>
-      </div>
-      <nav className="flex-1 space-y-1 p-3">
-        {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-              )
-            }
-          >
-            <item.icon className="size-4" />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="m-3 rounded-xl border border-border bg-[image:var(--gradient-subtle)] p-4">
-        <p className="text-sm font-medium">Transparency-first</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Every score expands to evidence; narrative citations link back to sources.
-        </p>
-        <NavLink
-          to="/methodology"
-          className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-primary hover:underline"
-        >
-          <Activity className="size-3.5" />
-          Limitations & cohort
-        </NavLink>
-      </div>
-    </aside>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {nav.map((item) => (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) =>
+                        cn(isActive && "bg-sidebar-accent font-medium text-sidebar-accent-foreground")
+                      }
+                    >
+                      <item.icon className="size-4" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
   );
 }

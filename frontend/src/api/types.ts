@@ -1,17 +1,115 @@
 export type ReadinessStatus = "green" | "yellow" | "red";
 
-export interface ComponentScore {
+/** UK NEWS2 aggregate clinical band (RCP thresholds on total score). */
+export type NewsClinicalBand = "low" | "medium" | "high";
+
+export interface NewsParameterScore {
+  name: string;
   label: string;
-  score: number;
-  status: ReadinessStatus;
-  evidence: string[];
+  points: number;
+  value_display: string;
+  subscale_note?: string | null;
 }
 
-export interface ReadinessResponse {
+export interface NewsScoreResponse {
   stay_id: number;
-  composite_score: number;
-  composite_status: ReadinessStatus;
-  components: ComponentScore[];
+  total_score: number;
+  clinical_risk_band: NewsClinicalBand;
+  parameters: NewsParameterScore[];
+  evidence: string[];
+  limitations: string[];
+  scale_note: string;
+}
+
+export interface WardPreviewRow {
+  stay_id: number;
+  display_patient_id: string;
+  news_total: number;
+  news_band: NewsClinicalBand;
+  icu_los_hours?: number | null;
+}
+
+export interface WardSummaryResponse {
+  census_count: number;
+  bed_capacity: number;
+  occupancy_ratio: number;
+  pending_admissions_count: number;
+  discharge_ready_count: number;
+  discharge_queue_preview: WardPreviewRow[];
+  high_risk_preview: WardPreviewRow[];
+}
+
+export type WardAlertCategory = "lab_trajectory" | "news_context";
+
+export interface WardAlertItem {
+  id: string;
+  category: WardAlertCategory;
+  message: string;
+  occurred_at: string;
+  stay_id?: number | null;
+}
+
+export interface WardAlertsResponse {
+  alerts: WardAlertItem[];
+}
+
+export interface VitalSeriesPoint {
+  charttime_iso: string | null;
+  valuenum: number;
+}
+
+export interface VitalTimeSeries {
+  itemid: number;
+  label: string;
+  points: VitalSeriesPoint[];
+}
+
+export interface VitalsSeriesResponse {
+  stay_id: number;
+  series: VitalTimeSeries[];
+}
+
+export interface WatchlistRow {
+  subject_id: number;
+  index_stay_id: number;
+  display_patient_id: string;
+  added_at: string;
+  news_total: number;
+  news_band: NewsClinicalBand;
+  data_freshness_note: string;
+}
+
+export interface WatchlistListResponse {
+  entries: WatchlistRow[];
+}
+
+export type DischargeDestinationCode =
+  | "general_ward"
+  | "ltach"
+  | "nursing_facility"
+  | "home"
+  | "other";
+
+export interface DischargeEventCreate {
+  stay_id: number;
+  subject_id: number;
+  destination: DischargeDestinationCode;
+  notes?: string | null;
+}
+
+export interface DischargeEventResponse {
+  stay_id: number;
+  subject_id: number;
+  destination: string;
+  notes: string;
+  recorded_at: string;
+}
+
+export interface RiskDriverFeature {
+  feature_key: string;
+  label: string;
+  direction: string;
+  detail: string;
 }
 
 export interface RiskDefinition {
@@ -20,11 +118,27 @@ export interface RiskDefinition {
   confidence_interval: [number, number];
   methodology: string;
   n_train: number;
+  explanation?: string | null;
+  driver_features?: RiskDriverFeature[];
 }
 
 export interface RiskResponse {
   stay_id: number;
   risks: RiskDefinition[];
+}
+
+export interface DischargeTimingScenario {
+  horizon_hours: number;
+  probability: number;
+  delta_vs_now?: number | null;
+}
+
+export interface DischargeTimingResponse {
+  stay_id: number;
+  scenarios: DischargeTimingScenario[];
+  disclaimer: string;
+  methodology_note: string;
+  is_placeholder?: boolean;
 }
 
 export interface SimilarCase {
@@ -39,7 +153,7 @@ export interface GroundingEvidence {
   id: string;
   feature: string;
   finding: string;
-  anchor: "readiness_component" | "risk" | "audit" | "trajectory" | null;
+  anchor: "news_parameter" | "risk" | "audit" | "trajectory" | null;
 }
 
 export interface NarrativeResponse {
@@ -78,7 +192,8 @@ export interface StayListRow {
   gender: string | null;
   primary_diagnosis: string | null;
   icu_los_hours: number | null;
-  readiness_status: ReadinessStatus;
+  news_total: number;
+  news_band: NewsClinicalBand;
   is_demo: boolean;
 }
 
@@ -86,36 +201,16 @@ export interface StayListResponse {
   stays: StayListRow[];
 }
 
-export interface TrajectoryPoint {
-  t_hours: number;
-  y: number;
-}
-
-export interface TrajectoryForecast {
-  t_hours: number[];
-  mean: number[];
-  lower: number[];
-  upper: number[];
-}
-
-export interface TrajectorySeries {
-  series_id: string;
+export interface VitalsRow {
+  itemid: number;
   label: string;
-  unit: string;
-  points: TrajectoryPoint[];
-  normal_low: number | null;
-  normal_high: number | null;
-  trend_label: string;
-  forecast: TrajectoryForecast | null;
-  discharge_t_hours: number | null;
+  value: number;
+  charttime_iso: string | null;
 }
 
-export interface TrajectoryResponse {
+export interface CurrentVitalsResponse {
   stay_id: number;
-  intime_iso: string | null;
-  outtime_iso: string | null;
-  disclaimer: string;
-  series: TrajectorySeries[];
+  vitals: VitalsRow[];
 }
 
 export interface PatientSummary {
@@ -134,4 +229,8 @@ export interface PatientSummary {
   discharge_location: string | null;
   hospital_expire_flag: number | null;
   primary_diagnosis: string | null;
+  /** Recorded ICU discharge in app (Mongo); patient leaves ward census roster. */
+  discharged_from_icu?: boolean;
+  /** On post-monitoring watchlist (Mongo). */
+  post_monitoring?: boolean;
 }
