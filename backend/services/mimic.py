@@ -34,8 +34,11 @@ def _conn():
     # prepare_threshold=0 avoids prepared-statement issues with poolers (e.g. Supabase).
     url = (os.getenv("DATABASE_URL") or "").strip()
     if url:
-        url = url.replace("postgresql+psycopg://", "postgresql://", 1).replace(
-            "postgresql+psycopg2://", "postgresql://", 1
+        # libpq URI: strip SQLAlchemy / mistaken driver prefixes (Supabase docs sometimes say "psycopg3").
+        url = (
+            url.replace("postgresql+psycopg3://", "postgresql://", 1)
+            .replace("postgresql+psycopg://", "postgresql://", 1)
+            .replace("postgresql+psycopg2://", "postgresql://", 1)
         )
         return psycopg.connect(url, row_factory=dict_row, prepare_threshold=0)
     return psycopg.connect(_CONNSTR, row_factory=dict_row, prepare_threshold=0)

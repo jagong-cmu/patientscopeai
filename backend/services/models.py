@@ -73,6 +73,8 @@ def _get_features_engine():
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
         return None
+    # SQLAlchemy psycopg3 dialect is postgresql+psycopg://, not +psycopg3 (common Supabase copy-paste mistake).
+    url = url.replace("postgresql+psycopg3://", "postgresql+psycopg://", 1)
     if _sql_engine is not None:
         return _sql_engine
     with _sql_engine_lock:

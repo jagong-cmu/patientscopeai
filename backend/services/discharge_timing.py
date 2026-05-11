@@ -57,6 +57,9 @@ def _fetch_features_row(stay_id: int, cols: list[str]) -> np.ndarray | None:
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
         return None
+    database_url = database_url.replace(
+        "postgresql+psycopg3://", "postgresql+psycopg://", 1
+    )
     q = text(f"SELECT {', '.join(cols)} FROM mimicscope.features_v1 WHERE stay_id = :stay_id")
     engine = create_engine(database_url)
     try:
