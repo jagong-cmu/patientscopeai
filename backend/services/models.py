@@ -81,11 +81,13 @@ def _get_features_engine():
         if _sql_engine is None:
             from sqlalchemy import create_engine
 
+            pool_size = max(1, int(os.getenv("SQLALCHEMY_POOL_SIZE", "2")))
+            max_overflow = max(0, int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "2")))
             _sql_engine = create_engine(
                 url,
                 pool_pre_ping=True,
-                pool_size=4,
-                max_overflow=8,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
             )
     return _sql_engine
 

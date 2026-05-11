@@ -4,6 +4,7 @@ certifi>=2024.0.0          # CA bundle for HTTPS (urllib on macOS python.org)
 
 # Database
 psycopg[binary]>=3.1.0      # psycopg3 — used by API and notebooks
+psycopg-pool>=3.2.0         # bounded pool for Supabase session pooler (low conn limit)
 SQLAlchemy>=2.0.0
 ipython-sql>=0.5.0          # %%sql magic in notebooks
 prettytable>=2.5,<3         # v3 breaks ipython-sql table display (KeyError: 'DEFAULT')

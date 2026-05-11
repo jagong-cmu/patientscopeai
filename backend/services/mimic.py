@@ -1,6 +1,10 @@
 """MIMIC-IV PostgreSQL query layer (psycopg3)."""
+from __future__ import annotations
+
 import os
+import threading
 import time
+from contextlib import contextmanager
 
 import psycopg
 from psycopg.rows import dict_row
@@ -16,6 +20,47 @@ _CONNSTR = (
     f"password={os.getenv('POSTGRES_PASSWORD', 'mimic')}"
 )
 
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _normalized_database_url() -> str | None:
+    url = (os.getenv("DATABASE_URL") or "").strip()
+    if not url:
+        return None
+    return (
+        url.replace("postgresql+psycopg3://", "postgresql://", 1)
+        .replace("postgresql+psycopg://", "postgresql://", 1)
+        .replace("postgresql+psycopg2://", "postgresql://", 1)
+    )
+
+
+def _get_pool():
+    """
+    Reuse connections when DATABASE_URL is set (critical for Supabase session pooler ~15 conns).
+    Tune PSYCOPG_POOL_MAX (default 8). Prefer Supabase *transaction* pooler (port 6543) for heavy fan-out.
+    """
+    global _pool
+    if _pool is not None:
+        return _pool
+    with _pool_lock:
+        if _pool is None:
+            from psycopg_pool import ConnectionPool
+
+            url = _normalized_database_url()
+            if not url:
+                return None
+            max_size = max(1, int(os.getenv("PSYCOPG_POOL_MAX", "8")))
+            timeout = float(os.getenv("PSYCOPG_POOL_TIMEOUT", "120"))
+            _pool = ConnectionPool(
+                url,
+                min_size=1,
+                max_size=max_size,
+                kwargs={"row_factory": dict_row, "prepare_threshold": 0},
+                timeout=timeout,
+            )
+    return _pool
+
 
 def ping_database_ms() -> tuple[bool, float]:
     """Returns (success, round-trip milliseconds)."""
@@ -28,20 +73,21 @@ def ping_database_ms() -> tuple[bool, float]:
         return False, (time.perf_counter() - t0) * 1000.0
 
 
+@contextmanager
 def _conn():
     # Prefer a full SQLAlchemy-style DATABASE_URL when present (e.g. Supabase).
     # psycopg3 doesn't understand SQLAlchemy's "postgresql+psycopg://" scheme.
     # prepare_threshold=0 avoids prepared-statement issues with poolers (e.g. Supabase).
-    url = (os.getenv("DATABASE_URL") or "").strip()
+    url = _normalized_database_url()
     if url:
-        # libpq URI: strip SQLAlchemy / mistaken driver prefixes (Supabase docs sometimes say "psycopg3").
-        url = (
-            url.replace("postgresql+psycopg3://", "postgresql://", 1)
-            .replace("postgresql+psycopg://", "postgresql://", 1)
-            .replace("postgresql+psycopg2://", "postgresql://", 1)
-        )
-        return psycopg.connect(url, row_factory=dict_row, prepare_threshold=0)
-    return psycopg.connect(_CONNSTR, row_factory=dict_row, prepare_threshold=0)
+        pool = _get_pool()
+        if pool is None:
+            raise RuntimeError("DATABASE_URL set but connection pool failed to initialize")
+        with pool.connection() as con:
+            yield con
+        return
+    with psycopg.connect(_CONNSTR, row_factory=dict_row, prepare_threshold=0) as con:
+        yield con
 
 
 def get_patient_summary(stay_id: int) -> dict | None:
